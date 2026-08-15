@@ -90,19 +90,24 @@ export function BuscaSKU({
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
             {/* SKU / Code Text Input */}
             <div className="md:col-span-6 relative">
+              <label htmlFor="sku-search-input" className="sr-only">
+                Buscar por SKU, código ou nome
+              </label>
               <input
                 id="sku-search-input"
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Buscar SKU, código ou nome... (Ctrl + K)"
-                className="w-full pl-10 pr-4 py-3 bg-dark-900/90 text-white rounded-xl border border-slate-700/80 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 text-sm font-mono placeholder:font-sans placeholder:text-slate-500 shadow-inner transition-all"
+                aria-label="Buscar SKU, código ou nome"
+                className="w-full pl-10 pr-4 py-3 bg-dark-900/90 text-white rounded-xl border border-slate-700/80 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 text-sm font-mono placeholder:font-sans placeholder:text-slate-500 shadow-inner transition-colors"
               />
               <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
               {searchTerm && (
                 <button
                   type="button"
                   onClick={() => setSearchTerm('')}
+                  aria-label="Limpar busca"
                   className="absolute right-3.5 top-3.5 text-xs text-slate-400 hover:text-white"
                 >
                   Limpar
@@ -113,6 +118,7 @@ export function BuscaSKU({
             {/* Color Filter */}
             <div className="md:col-span-3">
               <select
+                aria-label="Filtrar por Cor"
                 value={selectedCor}
                 onChange={(e) => setSelectedCor(e.target.value)}
                 className="w-full px-3.5 py-3 bg-dark-900/90 text-slate-200 rounded-xl border border-slate-700/80 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 text-sm"
@@ -129,6 +135,7 @@ export function BuscaSKU({
             {/* Type Filter */}
             <div className="md:col-span-3">
               <select
+                aria-label="Filtrar por Tipo"
                 value={selectedTipo}
                 onChange={(e) => setSelectedTipo(e.target.value)}
                 className="w-full px-3.5 py-3 bg-dark-900/90 text-slate-200 rounded-xl border border-slate-700/80 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 text-sm"

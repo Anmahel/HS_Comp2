@@ -10,11 +10,13 @@ export function FormularioPecaFields({
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       {/* Tipo Dropdown */}
       <div className="space-y-1.5">
-        <label className="block text-xs font-semibold text-slate-200">
+        <label htmlFor="form-peca-tipo" className="block text-xs font-semibold text-slate-200">
           Tipo da Peça *
         </label>
         <select
+          id="form-peca-tipo"
           data-testid="select-tipo"
+          aria-label="Tipo da Peça"
           value={formData.tipo_id || ''}
           onChange={(e) => onChange('tipo_id', e.target.value)}
           required
@@ -31,11 +33,13 @@ export function FormularioPecaFields({
 
       {/* Tamanho Dropdown */}
       <div className="space-y-1.5">
-        <label className="block text-xs font-semibold text-slate-200">
+        <label htmlFor="form-peca-tamanho" className="block text-xs font-semibold text-slate-200">
           Tamanho *
         </label>
         <select
+          id="form-peca-tamanho"
           data-testid="select-tamanho"
+          aria-label="Tamanho"
           value={formData.tamanho_id || ''}
           onChange={(e) => onChange('tamanho_id', e.target.value)}
           required

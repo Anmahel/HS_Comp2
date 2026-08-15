@@ -15,13 +15,14 @@ async function request(endpoint, options = {}) {
   }
 
   const response = await fetch(url, config);
-  const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const errorMsg = data && data.error ? data.error : `Erro HTTP ${response.status}`;
+    const errorData = await response.json().catch(() => null);
+    const errorMsg = errorData && errorData.error ? errorData.error : `Erro HTTP ${response.status}`;
     throw new Error(errorMsg);
   }
 
+  const data = await response.json().catch(() => null);
   return data;
 }
 

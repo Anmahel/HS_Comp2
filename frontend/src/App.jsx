@@ -45,18 +45,19 @@ export function App() {
 
   // Keyboard Shortcuts (Ctrl+K / Cmd+K and Esc)
   useEffect(() => {
+    let animFrameId = null;
     const handleKeyDown = (e) => {
       // Ctrl+K / Cmd+K -> Focus SKU Search
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setActiveTab('verificador');
-        setTimeout(() => {
+        animFrameId = requestAnimationFrame(() => {
           const input = document.getElementById('sku-search-input');
           if (input) {
             input.focus();
             input.select();
           }
-        }, 50);
+        });
       }
 
       // Esc -> Close active modal
@@ -67,7 +68,10 @@ export function App() {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+    };
   }, [isFormModalOpen, isDeductModalOpen, setActiveTab, closeFormModal, closeDeductModal]);
 
   return (
@@ -142,22 +146,28 @@ export function App() {
       </main>
 
       {/* Global Modals */}
-      <FormularioEstoqueModal
-        isOpen={isFormModalOpen}
-        category={formCategory}
-        itemToEdit={itemToEdit}
-        catalogs={catalogs}
-        onClose={closeFormModal}
-        onSave={saveInventoryItem}
-      />
+      {isFormModalOpen && (
+        <FormularioEstoqueModal
+          isOpen={isFormModalOpen}
+          key={`form-${formCategory}-${itemToEdit ? itemToEdit.id : 'new'}`}
+          category={formCategory}
+          itemToEdit={itemToEdit}
+          catalogs={catalogs}
+          onClose={closeFormModal}
+          onSave={saveInventoryItem}
+        />
+      )}
 
-      <ModalUsarEstoque
-        isOpen={isDeductModalOpen}
-        item={itemToDeduct}
-        category={deductCategory}
-        onClose={closeDeductModal}
-        onConfirm={deductStock}
-      />
+      {isDeductModalOpen && (
+        <ModalUsarEstoque
+          isOpen={isDeductModalOpen}
+          key={`deduct-${deductCategory}-${itemToDeduct ? itemToDeduct.id : 'item'}`}
+          item={itemToDeduct}
+          category={deductCategory}
+          onClose={closeDeductModal}
+          onConfirm={deductStock}
+        />
+      )}
 
       {/* Footer */}
       <footer className="border-t border-slate-800/80 bg-dark-900/60 py-4 text-center text-xs text-slate-500 font-mono">

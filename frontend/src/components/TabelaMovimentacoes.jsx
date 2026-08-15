@@ -2,7 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { History, ArrowDownRight, ArrowUpRight, RefreshCw, Filter } from 'lucide-react';
 import { formatDateTime, getMovimentoBadge } from '../utils/formatters';
 
-export function TabelaMovimentacoes({ movimentacoes = [] }) {
+const EMPTY_MOVIMENTACOES = [];
+
+export function TabelaMovimentacoes({ movimentacoes = EMPTY_MOVIMENTACOES }) {
   const [filterTipo, setFilterTipo] = useState('');
   const [filterCategoria, setFilterCategoria] = useState('');
 
@@ -25,6 +27,7 @@ export function TabelaMovimentacoes({ movimentacoes = [] }) {
 
         <div className="flex items-center gap-2">
           <select
+            aria-label="Filtrar por Categoria"
             value={filterCategoria}
             onChange={(e) => setFilterCategoria(e.target.value)}
             className="px-3 py-1.5 bg-dark-900 text-slate-300 rounded-xl border border-slate-700 text-xs"
@@ -35,6 +38,7 @@ export function TabelaMovimentacoes({ movimentacoes = [] }) {
           </select>
 
           <select
+            aria-label="Filtrar por Tipo de Movimento"
             value={filterTipo}
             onChange={(e) => setFilterTipo(e.target.value)}
             className="px-3 py-1.5 bg-dark-900 text-slate-300 rounded-xl border border-slate-700 text-xs"

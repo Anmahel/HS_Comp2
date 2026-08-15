@@ -3,6 +3,7 @@ import { X, Lock, Sparkles, Plus, AlertCircle, Shirt, Palette, ShieldAlert } fro
 import { generateSku } from '../utils/sku';
 import { FormularioPecaFields } from './FormularioPecaFields';
 import { FormularioEstampaFields } from './FormularioEstampaFields';
+import { FormularioDesignInputs } from './FormularioDesignInputs';
 import { ConfirmacaoEstoqueModal } from './ConfirmacaoEstoqueModal';
 
 export function FormularioEstoqueModal({
@@ -16,50 +17,34 @@ export function FormularioEstoqueModal({
   const isEditing = Boolean(itemToEdit);
   const { brands = [], cores = [], designs = [], tamanhos = [], tipos = [] } = catalogs;
 
-  const [formData, setFormData] = useState({
-    categoria: category,
-    brand_id: '',
-    codigo_estampa: '',
-    nome_design: '',
-    cor_id: '',
-    tipo_id: '',
-    tamanho_id: '',
-    quantidade: 1,
-  });
+  const initialFormData = useMemo(() => {
+    if (itemToEdit) {
+      return {
+        categoria: category,
+        brand_id: itemToEdit.brand_id || '',
+        codigo_estampa: itemToEdit.codigo_estampa || '',
+        nome_design: itemToEdit.nome_design || '',
+        cor_id: itemToEdit.cor_id || '',
+        tipo_id: itemToEdit.tipo_id || '',
+        tamanho_id: itemToEdit.tamanho_id || '',
+        quantidade: itemToEdit.quantidade || 0,
+      };
+    }
+    return {
+      categoria: category,
+      brand_id: brands[0]?.id || '',
+      codigo_estampa: '',
+      nome_design: '',
+      cor_id: cores[0]?.id || '',
+      tipo_id: tipos[0]?.id || '',
+      tamanho_id: tamanhos[0]?.id || '',
+      quantidade: 1,
+    };
+  }, [itemToEdit, category, brands, cores, tipos, tamanhos]);
 
+  const [formData, setFormData] = useState(initialFormData);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
-  // Initialize or reset form on open/item change
-  useEffect(() => {
-    if (isOpen) {
-      if (itemToEdit) {
-        setFormData({
-          categoria: category,
-          brand_id: itemToEdit.brand_id || '',
-          codigo_estampa: itemToEdit.codigo_estampa || '',
-          nome_design: itemToEdit.nome_design || '',
-          cor_id: itemToEdit.cor_id || '',
-          tipo_id: itemToEdit.tipo_id || '',
-          tamanho_id: itemToEdit.tamanho_id || '',
-          quantidade: itemToEdit.quantidade || 0,
-        });
-      } else {
-        setFormData({
-          categoria: category,
-          brand_id: brands[0]?.id || '',
-          codigo_estampa: '',
-          nome_design: '',
-          cor_id: cores[0]?.id || '',
-          tipo_id: tipos[0]?.id || '',
-          tamanho_id: tamanhos[0]?.id || '',
-          quantidade: 1,
-        });
-      }
-      setIsConfirmOpen(false);
-      setSubmitting(false);
-    }
-  }, [isOpen, itemToEdit, category, brands, cores, tipos, tamanhos]);
 
   // Reactive Design Code Check
   // Rule: If Cód. Estampa matches an existing design, lock Nome do Design & auto-populate
@@ -68,16 +53,6 @@ export function FormularioEstoqueModal({
     if (!cod) return null;
     return designs.find((d) => String(d.codigo_estampa).trim() === cod);
   }, [formData.codigo_estampa, designs]);
-
-  // Auto-fill design name when code exists
-  useEffect(() => {
-    if (existingDesign) {
-      setFormData((prev) => ({
-        ...prev,
-        nome_design: existingDesign.nome_design,
-      }));
-    }
-  }, [existingDesign]);
 
   if (!isOpen) return null;
 
@@ -123,11 +98,14 @@ export function FormularioEstoqueModal({
   };
 
   const handleFinalSubmit = async () => {
-    setSubmitting(true);
-    const success = await onSave(formData);
-    setSubmitting(false);
-    if (success) {
-      setIsConfirmOpen(false);
+    try {
+      setSubmitting(true);
+      const success = await onSave(formData);
+      if (success) {
+        setIsConfirmOpen(false);
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -154,6 +132,7 @@ export function FormularioEstoqueModal({
             <button
               type="button"
               onClick={onClose}
+              aria-label="Fechar formulário"
               className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/60 transition-colors"
             >
               <X className="h-4 w-4" />
@@ -185,11 +164,13 @@ export function FormularioEstoqueModal({
 
             {/* Brand Selector */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-200">
+              <label htmlFor="form-brand" className="block text-xs font-semibold text-slate-200">
                 Marca *
               </label>
               <select
+                id="form-brand"
                 data-testid="select-brand"
+                aria-label="Marca"
                 disabled={isEditing}
                 value={formData.brand_id || ''}
                 onChange={(e) => handleChange('brand_id', e.target.value)}
@@ -208,61 +189,23 @@ export function FormularioEstoqueModal({
             </div>
 
             {/* Design Code & Design Name Rules Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Cód. Estampa: Always Editable */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-slate-200">
-                  Cód. Estampa *
-                </label>
-                <input
-                  type="text"
-                  data-testid="input-codigo-estampa"
-                  value={formData.codigo_estampa}
-                  onChange={handleDesignCodeChange}
-                  placeholder="Ex: 001, 002..."
-                  required
-                  className="w-full px-3 py-2 bg-dark-900 text-white font-mono rounded-xl border border-slate-700 text-xs focus:border-rose-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Nome do Design: Conditionally Disabled if Code Exists */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-slate-200">
-                    Nome do Design *
-                  </label>
-                  {existingDesign && (
-                    <span
-                      data-testid="badge-design-registrado"
-                      className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30 flex items-center gap-1"
-                    >
-                      <Lock className="h-2.5 w-2.5" />
-                      Registrado
-                    </span>
-                  )}
-                </div>
-                <input
-                  type="text"
-                  data-testid="input-nome-design"
-                  disabled={Boolean(existingDesign)}
-                  value={formData.nome_design}
-                  onChange={(e) => handleChange('nome_design', e.target.value)}
-                  placeholder={existingDesign ? existingDesign.nome_design : 'Digite o nome do design...'}
-                  required
-                  className={`w-full px-3 py-2 bg-dark-900 text-white rounded-xl border border-slate-700 text-xs focus:border-rose-500 focus:outline-none ${
-                    existingDesign ? 'opacity-60 cursor-not-allowed bg-slate-900' : ''
-                  }`}
-                />
-              </div>
-            </div>
+            <FormularioDesignInputs
+              codigoEstampa={formData.codigo_estampa}
+              nomeDesign={formData.nome_design}
+              existingDesign={existingDesign}
+              onCodeChange={handleDesignCodeChange}
+              onNameChange={(val) => handleChange('nome_design', val)}
+            />
 
             {/* Cor do Tecido */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-200">
+              <label htmlFor="form-cor" className="block text-xs font-semibold text-slate-200">
                 Cor do Tecido / Base *
               </label>
               <select
+                id="form-cor"
                 data-testid="select-cor"
+                aria-label="Cor do Tecido"
                 value={formData.cor_id || ''}
                 onChange={(e) => handleChange('cor_id', e.target.value)}
                 required
@@ -291,13 +234,15 @@ export function FormularioEstoqueModal({
 
             {/* Quantidade Input */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-200">
+              <label htmlFor="form-quantidade" className="block text-xs font-semibold text-slate-200">
                 Quantidade {isEditing ? 'em Estoque' : 'para Adicionar'} *
               </label>
               <input
+                id="form-quantidade"
                 type="number"
                 min="0"
                 data-testid="input-quantidade"
+                aria-label="Quantidade"
                 value={formData.quantidade}
                 onChange={(e) => handleChange('quantidade', parseInt(e.target.value, 10) || 0)}
                 required
@@ -317,7 +262,7 @@ export function FormularioEstoqueModal({
               <button
                 type="submit"
                 data-testid="submit-form-btn"
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white text-xs font-semibold shadow-md shadow-rose-600/30 transition-all active:scale-95"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white text-xs font-semibold shadow-md shadow-rose-600/30 transition-colors active:scale-95"
               >
                 <span>{isEditing ? 'Avançar para Atualização' : 'Avançar para Cadastro'}</span>
               </button>

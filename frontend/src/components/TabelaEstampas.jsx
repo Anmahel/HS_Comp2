@@ -2,8 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { ArrowUpDown, Edit, MinusCircle, Trash2, Search, Palette, Plus } from 'lucide-react';
 import { formatDateTime } from '../utils/formatters';
 
+const EMPTY_ITEMS = [];
+
 export function TabelaEstampas({
-  items = [],
+  items = EMPTY_ITEMS,
   loading = false,
   onOpenCreate,
   onOpenEdit,
@@ -65,11 +67,16 @@ export function TabelaEstampas({
         <div className="flex flex-wrap items-center gap-3 flex-1">
           <div className="relative flex-1 min-w-[200px] max-w-md">
             <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+            <label htmlFor="filtro-estampas-input" className="sr-only">
+              Filtrar estampas
+            </label>
             <input
+              id="filtro-estampas-input"
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Filtrar estampas por SKU, código, design..."
+              aria-label="Filtrar estampas por SKU, código ou design"
               className="w-full pl-9 pr-3 py-2 bg-dark-900 text-white rounded-xl border border-slate-700/80 text-xs focus:border-rose-500 focus:outline-none placeholder:text-slate-500"
             />
           </div>
@@ -89,7 +96,7 @@ export function TabelaEstampas({
           type="button"
           data-testid="create-estampa-btn"
           onClick={() => onOpenCreate('estampa')}
-          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white text-xs font-semibold shadow-md shadow-rose-600/20 transition-all self-start sm:self-auto active:scale-95"
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white text-xs font-semibold shadow-md shadow-rose-600/20 transition-colors self-start sm:self-auto active:scale-95"
         >
           <Plus className="h-4 w-4" />
           <span>Nova Estampa Avulsa</span>

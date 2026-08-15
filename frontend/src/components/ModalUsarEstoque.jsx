@@ -11,13 +11,6 @@ export function ModalUsarEstoque({
   const [quantidade, setQuantidade] = useState(1);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      setQuantidade(1);
-      setSubmitting(false);
-    }
-  }, [isOpen]);
-
   if (!isOpen || !item) return null;
 
   const maxAvailable = item.quantidade || 0;
@@ -27,9 +20,12 @@ export function ModalUsarEstoque({
     e.preventDefault();
     if (isInvalid) return;
 
-    setSubmitting(true);
-    await onConfirm(item.id, category, parseInt(quantidade, 10));
-    setSubmitting(false);
+    try {
+      setSubmitting(true);
+      await onConfirm(item.id, category, parseInt(quantidade, 10));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -52,6 +48,7 @@ export function ModalUsarEstoque({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Fechar modal de baixa"
             className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/60 transition-colors"
           >
             <X className="h-4 w-4" />
@@ -78,28 +75,32 @@ export function ModalUsarEstoque({
 
           {/* Quantity Input */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-semibold text-slate-200">
+            <label htmlFor="deduct-quantidade" className="block text-xs font-semibold text-slate-200">
               Quantidade para dar baixa:
             </label>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setQuantidade((q) => Math.max(1, q - 1))}
+                aria-label="Diminuir quantidade"
                 className="px-3 py-2 bg-dark-900 text-white rounded-xl border border-slate-700 font-mono font-bold hover:bg-slate-700 transition-colors"
               >
                 -
               </button>
               <input
+                id="deduct-quantidade"
                 type="number"
                 min="1"
                 max={maxAvailable}
                 value={quantidade}
+                aria-label="Quantidade para dar baixa"
                 onChange={(e) => setQuantidade(parseInt(e.target.value, 10) || 0)}
                 className="w-full text-center py-2 bg-dark-900 text-white rounded-xl border border-slate-700 font-mono font-bold text-sm focus:border-rose-500 focus:outline-none"
               />
               <button
                 type="button"
                 onClick={() => setQuantidade((q) => Math.min(maxAvailable, q + 1))}
+                aria-label="Aumentar quantidade"
                 className="px-3 py-2 bg-dark-900 text-white rounded-xl border border-slate-700 font-mono font-bold hover:bg-slate-700 transition-colors"
               >
                 +
@@ -135,7 +136,7 @@ export function ModalUsarEstoque({
               type="submit"
               data-testid="confirm-deduct-btn"
               disabled={isInvalid || submitting}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-semibold shadow-md shadow-rose-600/30 transition-all active:scale-95"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-semibold shadow-md shadow-rose-600/30 transition-colors active:scale-95"
             >
               <Check className="h-3.5 w-3.5" />
               <span>{submitting ? 'Processando...' : 'Confirmar Baixa'}</span>

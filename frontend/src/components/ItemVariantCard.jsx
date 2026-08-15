@@ -11,7 +11,7 @@ export function ItemVariantCard({
   const isLowStock = item.quantidade < 5;
 
   return (
-    <div className="p-4 rounded-xl bg-dark-800/90 border border-slate-700/60 hover:border-slate-600 transition-all flex flex-col justify-between gap-3 shadow-md">
+    <div className="p-4 rounded-xl bg-dark-800/90 border border-slate-700/60 hover:border-slate-600 transition-colors flex flex-col justify-between gap-3 shadow-md">
       <div>
         {/* Header Badges */}
         <div className="flex items-center justify-between gap-2 mb-2">

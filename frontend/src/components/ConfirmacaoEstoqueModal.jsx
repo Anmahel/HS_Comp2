@@ -32,6 +32,7 @@ export function ConfirmacaoEstoqueModal({
           <button
             type="button"
             onClick={onCancel}
+            aria-label="Fechar modal de confirmação"
             className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
           >
             <X className="h-4 w-4" />
@@ -87,7 +88,7 @@ export function ConfirmacaoEstoqueModal({
               data-testid="final-confirm-submit-btn"
               disabled={submitting}
               onClick={onConfirm}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white font-semibold shadow-md shadow-rose-600/30 transition-all active:scale-95"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white font-semibold shadow-md shadow-rose-600/30 transition-colors active:scale-95"
             >
               <Check className="h-4 w-4" />
               <span>{submitting ? 'Gravando...' : 'Gravar no Estoque'}</span>

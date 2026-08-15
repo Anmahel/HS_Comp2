@@ -97,7 +97,7 @@ export function Header({
             type="button"
             data-testid="header-new-item-btn"
             onClick={() => onOpenCreate('peca')}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white text-xs font-semibold shadow-lg shadow-rose-600/25 transition-all active:scale-95"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white text-xs font-semibold shadow-lg shadow-rose-600/25 transition-colors active:scale-95"
           >
             <Plus className="h-4 w-4" />
             <span>Cadastrar Item</span>
