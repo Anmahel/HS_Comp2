@@ -1,0 +1,20 @@
+[project]
+name = "hc-comp-backend"
+version = "1.0.0"
+description = "HC_comp Inventory & Stock Management System Backend API"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "flask>=3.0.0",
+    "flask-cors>=4.0.0",
+    "SQLAlchemy>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "gunicorn>=21.2.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "pytest-timeout>=2.2.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
