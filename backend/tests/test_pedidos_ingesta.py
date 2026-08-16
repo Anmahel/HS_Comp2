@@ -297,3 +297,127 @@ def test_rbac_roles_enforcement(client):
         headers={'X-User-Role': 'geral'}
     )
     assert resp2.status_code == 403
+
+
+# =========================================================================
+# 3. Olist / Tiny "Separação de Mercadorias" Specific Parser Tests
+# =========================================================================
+
+def test_olist_tiny_sku_and_quantity_formats():
+    from services.parser_service import parse_quantity_value
+
+    # Test SKU patterns: CM-060-PRE-P, CF-643-PRE-G2, CM-778-AMA-M
+    p1 = parse_sku_details("CM-060-PRE-P")
+    assert p1['tipo_codigo'] == 'CM'
+    assert p1['codigo_estampa'] == '060'
+    assert p1['cor_codigo'] == 'PRE'
+    assert p1['tamanho'] == 'P'
+
+    p2 = parse_sku_details("CF-643-PRE-G2")
+    assert p2['tipo_codigo'] == 'CF'
+    assert p2['codigo_estampa'] == '643'
+    assert p2['cor_codigo'] == 'PRE'
+    assert p2['tamanho'] == 'G2'
+
+    p3 = parse_sku_details("CM-778-AMA-M")
+    assert p3['tipo_codigo'] == 'CM'
+    assert p3['codigo_estampa'] == '778'
+    assert p3['cor_codigo'] == 'AMA'
+    assert p3['tamanho'] == 'M'
+
+    # Test Decimal Quantity notations
+    assert parse_quantity_value("1,00 Pç") == 1
+    assert parse_quantity_value("2,00 Pç") == 2
+    assert parse_quantity_value("3,00 Pç") == 3
+    assert parse_quantity_value("10,00 Pç") == 10
+    assert parse_quantity_value("1.00 Pç") == 1
+    assert parse_quantity_value("5,00") == 5
+    assert parse_quantity_value("4") == 4
+
+
+def test_olist_tiny_pdf_extraction():
+    from services.parser_service import parse_pdf_content
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet
+
+    # Generate a realistic synthetic Olist/Tiny "Separação de mercadorias" PDF
+    pdf_buffer = io.BytesIO()
+    doc = SimpleDocTemplate(pdf_buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+
+    story = [
+        Paragraph("<b>Separação de mercadorias</b>", styles['Heading1']),
+        Paragraph("Relatório de expedição e picking", styles['Normal']),
+    ]
+
+    table_data = [
+        ["Produto", "Cód. (SKU/GTIN)", "Qtd. Un.", "Localização"],
+        ["Camiseta Masculina Classic Rock - P - Preta", "CM-060-PRE-P", "1,00 Pç", "A1-02"],
+        ["Camiseta Baby Look Un Belo Dia Ria - G2 - Preta", "CF-643-PRE-G2", "2,00 Pç", "B3-01"],
+        ["Camiseta Masculina Sun Light - M - Amarela", "CM-778-AMA-M", "3,00 Pç", "C2-05"],
+    ]
+
+    t = Table(table_data)
+    story.append(t)
+    doc.build(story)
+
+    pdf_bytes = pdf_buffer.getvalue()
+    extracted_items = parse_pdf_content(pdf_bytes)
+
+    assert len(extracted_items) == 3
+
+    item1 = extracted_items[0]
+    assert item1['sku_original'] == 'CM-060-PRE-P'
+    assert item1['quantidade'] == 1
+    assert item1['parsed_sku']['tipo_codigo'] == 'CM'
+    assert item1['parsed_sku']['codigo_estampa'] == '060'
+    assert item1['parsed_sku']['tamanho'] == 'P'
+
+    item2 = extracted_items[1]
+    assert item2['sku_original'] == 'CF-643-PRE-G2'
+    assert item2['quantidade'] == 2
+    assert item2['parsed_sku']['tipo_codigo'] == 'CF'
+    assert item2['parsed_sku']['codigo_estampa'] == '643'
+    assert item2['parsed_sku']['tamanho'] == 'G2'
+
+    item3 = extracted_items[2]
+    assert item3['sku_original'] == 'CM-778-AMA-M'
+    assert item3['quantidade'] == 3
+    assert item3['parsed_sku']['tipo_codigo'] == 'CM'
+    assert item3['parsed_sku']['codigo_estampa'] == '778'
+    assert item3['parsed_sku']['tamanho'] == 'M'
+
+
+def test_olist_tiny_csv_and_xlsx_direct_export():
+    # Test CSV with exact Olist/Tiny column names and 'X,00 Pç' notation
+    csv_text = """Produto;Cód. (SKU/GTIN);Qtd. Un.;Localização
+Camiseta Masculina Classic Rock - P - Preta;CM-060-PRE-P;1,00 Pç;A1-02
+Camiseta Baby Look Un Belo Dia Ria - G2 - Preta;CF-643-PRE-G2;2,00 Pç;B3-01
+Camiseta Masculina Sun Light - M - Amarela;CM-778-AMA-M;3,00 Pç;C2-05
+"""
+    items_csv = parse_csv_content(csv_text)
+    assert len(items_csv) == 3
+    assert items_csv[0]['sku_original'] == 'CM-060-PRE-P'
+    assert items_csv[0]['quantidade'] == 1
+    assert items_csv[1]['sku_original'] == 'CF-643-PRE-G2'
+    assert items_csv[1]['quantidade'] == 2
+    assert items_csv[2]['sku_original'] == 'CM-778-AMA-M'
+    assert items_csv[2]['quantidade'] == 3
+
+    # Test XLSX with exact Olist/Tiny layout
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["Produto", "Cód. (SKU/GTIN)", "Qtd. Un.", "Localização"])
+    ws.append(["Camiseta Masculina Classic Rock - P - Preta", "CM-060-PRE-P", "1,00 Pç", "A1-02"])
+    ws.append(["Camiseta Baby Look Un Belo Dia Ria - G2 - Preta", "CF-643-PRE-G2", "2,00 Pç", "B3-01"])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    items_xlsx = parse_xlsx_content(buf.getvalue())
+    assert len(items_xlsx) == 2
+    assert items_xlsx[0]['sku_original'] == 'CM-060-PRE-P'
+    assert items_xlsx[0]['quantidade'] == 1
+    assert items_xlsx[1]['sku_original'] == 'CF-643-PRE-G2'
+    assert items_xlsx[1]['quantidade'] == 2
+

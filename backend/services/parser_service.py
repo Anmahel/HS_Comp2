@@ -8,7 +8,7 @@ def parse_sku_details(sku_str):
     Deconstructs raw SKU strings into structured components.
     Supported Patterns:
       1. Brand-prefixed 5-part Piece: "CR-CM-001-PRE-M" -> {brand: 'CR', tipo: 'CM', design: '001', cor: 'PRE', tamanho: 'M', tipo_item: 'peca'}
-      2. 4-part Piece without Brand: "CF-643-PRE-G" -> {brand: None, tipo: 'CF', design: '643', cor: 'PRE', tamanho: 'G', tipo_item: 'peca'}
+      2. 4-part Piece without Brand (Olist/Tiny): "CF-643-PRE-G", "CM-060-PRE-P", "CF-643-PRE-G2" -> {brand: None, tipo: 'CF', design: '643', cor: 'PRE', tamanho: 'G2', tipo_item: 'peca'}
       3. Brand-prefixed Standalone Stamp: "CR-EST-643-PRE" -> {brand: 'CR', tipo: None, design: '643', cor: 'PRE', tamanho: None, tipo_item: 'estampa'}
       4. 2-part Standalone Stamp without Brand: "643-PRE" -> {brand: None, tipo: None, design: '643', cor: 'PRE', tamanho: None, tipo_item: 'estampa'}
     """
@@ -42,7 +42,7 @@ def parse_sku_details(sku_str):
             'normalized_sku': f"{parts[0]}-EST-{parts[2]}-{parts[3]}"
         }
 
-    # Case 3: 4 parts standard garment -> TIPO-DESIGN-COR-TAMANHO (e.g. CF-643-PRE-G)
+    # Case 3: 4 parts standard garment -> TIPO-DESIGN-COR-TAMANHO (e.g. CF-643-PRE-G, CM-060-PRE-P, CM-778-AMA-M)
     if len(parts) == 4:
         return {
             'tipo_item': 'peca',
@@ -66,17 +66,17 @@ def parse_sku_details(sku_str):
             'normalized_sku': f"{parts[0]}-{parts[1]}"
         }
 
-    # Fallback generic parsing with regex
-    garment_regex = re.compile(r'^([A-Z]{2,4})-([0-9]{1,4})-([A-Z]{3})-([A-Z0-9]{1,4})$')
+    # Fallback generic parsing with regex (CM-060-PRE-P, CF-643-PRE-G2, etc.)
+    garment_regex = re.compile(r'^(C[FM])-(\d+)-([A-Z]+)-([A-Z0-9]+)$', re.IGNORECASE)
     m = garment_regex.match(clean_sku)
     if m:
         return {
             'tipo_item': 'peca',
             'brand_slug': None,
-            'tipo_codigo': m.group(1),
+            'tipo_codigo': m.group(1).upper(),
             'codigo_estampa': m.group(2),
-            'cor_codigo': m.group(3),
-            'tamanho': m.group(4),
+            'cor_codigo': m.group(3).upper(),
+            'tamanho': m.group(4).upper(),
             'normalized_sku': clean_sku
         }
 
@@ -101,8 +101,36 @@ def find_column_key(row_dict, candidate_names):
     return None
 
 
+def parse_quantity_value(qtd_raw, default=1):
+    """
+    Parses Brazilian decimal quantity notation like '1,00 Pç', '2,00 Pç', '3.00', '1,0', '5'
+    into a clean integer count using int(float(str.replace(',', '.'))).
+    """
+    if qtd_raw is None:
+        return default
+
+    qtd_str = str(qtd_raw).strip()
+    if not qtd_str:
+        return default
+
+    # Extract decimal number from strings like '1,00 Pç', '2.00', '3,00', '5'
+    m = re.search(r'(\d+(?:[\.,]\d+)?)\s*(?:Pç|pc|pçs|un|peca|peça)?', qtd_str, re.IGNORECASE)
+    if m:
+        clean_num = m.group(1).replace(',', '.')
+        try:
+            val = int(float(clean_num))
+            return max(1, val)
+        except (ValueError, TypeError):
+            return default
+    return default
+
+
 def parse_csv_content(file_bytes_or_str):
-    """Parses CSV content into standardized raw order items."""
+    """
+    Parses CSV content into standardized raw order items.
+    Supports standard CSVs as well as Olist/Tiny exported CSVs:
+    Columns: [Produto] | [Cód. (SKU/GTIN)] | [Qtd. Un.] | [Localização]
+    """
     if isinstance(file_bytes_or_str, bytes):
         try:
             content = file_bytes_or_str.decode('utf-8')
@@ -123,26 +151,35 @@ def parse_csv_content(file_bytes_or_str):
     reader = csv.DictReader(f, delimiter=delimiter)
     items = []
 
+    # Olist/Tiny column candidates
+    sku_candidates = ['sku', 'codigo', 'cod', 'código_sku', 'codigo_sku', 'cód (sku/gtin)', 'cod (sku/gtin)', 'cod skugtin', 'codsku']
+    prod_candidates = ['produto', 'product', 'nome', 'descricao', 'item']
+    qtd_candidates = ['qtd un', 'qtd. un.', 'quantidade', 'qtd', 'qty', 'cantida', 'cantidad', 'quant']
+    data_candidates = ['data', 'data_pedido', 'date', 'fecha']
+    img_candidates = ['imagem', 'image', 'url_imagem', 'foto', 'imagem_url', 'img']
+
     for row in reader:
         if not row:
             continue
 
-        sku_col = find_column_key(row, ['sku', 'codigo', 'cod', 'código_sku', 'codigo_sku'])
-        prod_col = find_column_key(row, ['produto', 'product', 'nome', 'descricao', 'item'])
-        qtd_col = find_column_key(row, ['quantidade', 'qtd', 'qty', 'cantida', 'cantidad', 'quant'])
-        data_col = find_column_key(row, ['data', 'data_pedido', 'date', 'fecha'])
-        img_col = find_column_key(row, ['imagem', 'image', 'url_imagem', 'foto', 'imagem_url', 'img'])
+        sku_col = find_column_key(row, sku_candidates)
+        prod_col = find_column_key(row, prod_candidates)
+        qtd_col = find_column_key(row, qtd_candidates)
+        data_col = find_column_key(row, data_candidates)
+        img_col = find_column_key(row, img_candidates)
 
         sku_val = str(row.get(sku_col, '')).strip() if sku_col else ''
-        if not sku_val:
+        if not sku_val or sku_val.lower() == 'none':
             continue
+
+        # Extract clean SKU using regex if mixed with text
+        m_sku = re.search(r'\b(C[FM]-\d+-[A-Z]+-[A-Z0-9]+|\d+-[A-Z]+)\b', sku_val, re.IGNORECASE)
+        if m_sku:
+            sku_val = m_sku.group(1).upper()
 
         prod_val = str(row.get(prod_col, '')).strip() if prod_col else f"Produto {sku_val}"
         qtd_raw = row.get(qtd_col, 1) if qtd_col else 1
-        try:
-            qtd_val = max(1, int(float(str(qtd_raw).replace(',', '.'))))
-        except (ValueError, TypeError):
-            qtd_val = 1
+        qtd_val = parse_quantity_value(qtd_raw)
 
         data_val = str(row.get(data_col, '')).strip() if data_col else datetime.now(timezone.utc).strftime('%Y-%m-%d')
         img_val = str(row.get(img_col, '')).strip() if img_col else None
@@ -160,7 +197,10 @@ def parse_csv_content(file_bytes_or_str):
 
 
 def parse_xlsx_content(file_bytes):
-    """Parses Excel (.xlsx) file into standardized order items."""
+    """
+    Parses Excel (.xlsx) file into standardized order items.
+    Supports standard spreadsheets and Olist/Tiny Excel exports.
+    """
     import openpyxl
 
     wb = openpyxl.load_workbook(filename=io.BytesIO(file_bytes), data_only=True)
@@ -172,27 +212,35 @@ def parse_xlsx_content(file_bytes):
     headers = [str(h).strip() if h is not None else f"col_{i}" for i, h in enumerate(rows[0])]
     items = []
 
+    sku_candidates = ['sku', 'codigo', 'cod', 'código_sku', 'codigo_sku', 'cód (sku/gtin)', 'cod (sku/gtin)', 'cod skugtin', 'codsku']
+    prod_candidates = ['produto', 'product', 'nome', 'descricao', 'item']
+    qtd_candidates = ['qtd un', 'qtd. un.', 'quantidade', 'qtd', 'qty', 'cantida', 'cantidad', 'quant']
+    data_candidates = ['data', 'data_pedido', 'date', 'fecha']
+    img_candidates = ['imagem', 'image', 'url_imagem', 'foto', 'imagem_url', 'img']
+
     for row in rows[1:]:
         if not any(row):
             continue
         row_dict = {headers[i]: row[i] for i in range(min(len(headers), len(row)))}
 
-        sku_col = find_column_key(row_dict, ['sku', 'codigo', 'cod', 'código_sku', 'codigo_sku'])
-        prod_col = find_column_key(row_dict, ['produto', 'product', 'nome', 'descricao', 'item'])
-        qtd_col = find_column_key(row_dict, ['quantidade', 'qtd', 'qty', 'cantida', 'cantidad', 'quant'])
-        data_col = find_column_key(row_dict, ['data', 'data_pedido', 'date', 'fecha'])
-        img_col = find_column_key(row_dict, ['imagem', 'image', 'url_imagem', 'foto', 'imagem_url', 'img'])
+        sku_col = find_column_key(row_dict, sku_candidates)
+        prod_col = find_column_key(row_dict, prod_candidates)
+        qtd_col = find_column_key(row_dict, qtd_candidates)
+        data_col = find_column_key(row_dict, data_candidates)
+        img_col = find_column_key(row_dict, img_candidates)
 
         sku_val = str(row_dict.get(sku_col, '')).strip() if sku_col else ''
         if not sku_val or sku_val.lower() == 'none':
             continue
 
+        # Extract clean SKU using regex if mixed with text
+        m_sku = re.search(r'\b(C[FM]-\d+-[A-Z]+-[A-Z0-9]+|\d+-[A-Z]+)\b', sku_val, re.IGNORECASE)
+        if m_sku:
+            sku_val = m_sku.group(1).upper()
+
         prod_val = str(row_dict.get(prod_col, '')).strip() if prod_col else f"Produto {sku_val}"
         qtd_raw = row_dict.get(qtd_col, 1) if qtd_col else 1
-        try:
-            qtd_val = max(1, int(float(str(qtd_raw).replace(',', '.'))))
-        except (ValueError, TypeError):
-            qtd_val = 1
+        qtd_val = parse_quantity_value(qtd_raw)
 
         data_val = str(row_dict.get(data_col, '')).strip() if data_col else datetime.now(timezone.utc).strftime('%Y-%m-%d')
         img_val = str(row_dict.get(img_col, '')).strip() if img_col else None
@@ -213,49 +261,127 @@ def parse_xlsx_content(file_bytes):
 
 def parse_pdf_content(file_bytes):
     """
-    Parses PDF order sheets by extracting text and identifying SKU patterns and quantities.
+    Parses Olist/Tiny 'Separação de mercadorias' and general PDF order sheets.
+    Report Structure:
+      - Header: Separação de mercadorias
+      - Columns: [Produto] | [Cód. (SKU/GTIN)] | [Qtd. Un.] | [Localização]
+      - SKU format: r'(C[FM]-\d+-[A-Z]+-[A-Z0-9]+)' (e.g. CM-060-PRE-P, CF-643-PRE-G2, CM-778-AMA-M)
+      - Quantity format: r'(\d+[\.,]\d+)\s*Pç' (e.g. '1,00 Pç', '2,00 Pç')
     """
-    from pypdf import PdfReader
-
-    reader = PdfReader(io.BytesIO(file_bytes))
-    full_text = ""
-    for page in reader.pages:
-        text = page.extract_text()
-        if text:
-            full_text += "\n" + text
+    import pdfplumber
 
     items = []
-    lines = [l.strip() for l in full_text.split('\n') if l.strip()]
+    seen_keys = set()
 
-    # Pattern match lines with SKUs like CF-643-PRE-G, CM-001-BRA-P, CR-CM-001-PRE-M, 643-PRE
-    sku_regex = re.compile(r'\b(?:[A-Z]{2,4}-)?(?:[A-Z]{2}-)?([0-9]{1,4}|[A-Z0-9]+)-([A-Z]{3})(?:-([A-Z0-9]+))?\b')
+    # Regex targeting Olist/Tiny garment SKUs (CM-XXX-COR-TAM, CF-XXX-COR-TAM) and standalone stamps
+    sku_regex = re.compile(r'\b(C[FM]-\d+-[A-Z]+-[A-Z0-9]+|\d+-[A-Z]+)\b', re.IGNORECASE)
+    # Decimal quantity notation with Pç
+    qtd_pc_regex = re.compile(r'(\d+[\.,]\d+)\s*Pç', re.IGNORECASE)
 
-    for line in lines:
-        match = sku_regex.search(line)
-        if match:
-            raw_sku = match.group(0)
-            # Find quantity in the line (e.g. "Qtd: 2" or number at end of line)
-            qtd_match = re.search(r'(?:qtd|quant|cantida|cantidad|x)?\s*:?\s*(\d+)\b', line, re.IGNORECASE)
-            qtd_val = 1
-            if qtd_match:
-                try:
-                    qtd_val = max(1, int(qtd_match.group(1)))
-                except ValueError:
+    with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+        for page in pdf.pages:
+            # Method 1: Structured Table Extraction
+            tables = page.extract_tables() or []
+            for table in tables:
+                for row in table:
+                    if not row or not any(row):
+                        continue
+
+                    row_text = " ".join(str(c) for c in row if c)
+                    if 'Separação de mercadorias' in row_text or ('Produto' in row_text and 'Cód' in row_text):
+                        continue
+
+                    sku_val = None
+                    for cell in row:
+                        if cell:
+                            m_sku = sku_regex.search(str(cell).strip())
+                            if m_sku:
+                                sku_val = m_sku.group(1).upper()
+                                break
+
+                    if not sku_val:
+                        continue
+
+                    # Search for decimal quantity cell with 'Pç'
                     qtd_val = 1
+                    for cell in row:
+                        if cell:
+                            cell_str = str(cell).strip()
+                            m_qtd = qtd_pc_regex.search(cell_str)
+                            if m_qtd:
+                                qtd_val = parse_quantity_value(m_qtd.group(1))
+                                break
+                            elif 'Pç' in cell_str or re.match(r'^\d+(?:[\.,]\d+)?$', cell_str):
+                                qtd_val = parse_quantity_value(cell_str)
 
-            # Extract product title excluding the SKU
-            prod_name = line.replace(raw_sku, '').strip()
-            if not prod_name:
-                prod_name = f"Produto {raw_sku}"
+                    # Extract product name
+                    prod_val = None
+                    for cell in row:
+                        if cell:
+                            c_str = str(cell).strip()
+                            if c_str and sku_val not in c_str and 'Pç' not in c_str and not re.match(r'^\d+(?:[\.,]\d+)?$', c_str):
+                                prod_val = c_str
+                                break
 
-            items.append({
-                'sku_original': raw_sku,
-                'produto_nome': prod_name,
-                'quantidade': qtd_val,
-                'data_pedido': datetime.now(timezone.utc).strftime('%Y-%m-%d'),
-                'imagem_url': None,
-                'parsed_sku': parse_sku_details(raw_sku)
-            })
+                    if not prod_val:
+                        prod_val = f"Produto {sku_val}"
+
+                    item_key = f"{sku_val}_{qtd_val}_{prod_val}"
+                    if item_key not in seen_keys:
+                        seen_keys.add(item_key)
+                        items.append({
+                            'sku_original': sku_val,
+                            'produto_nome': prod_val,
+                            'quantidade': qtd_val,
+                            'data_pedido': datetime.now(timezone.utc).strftime('%Y-%m-%d'),
+                            'imagem_url': None,
+                            'parsed_sku': parse_sku_details(sku_val)
+                        })
+
+            # Method 2: Text Extraction Line-by-Line (for Olist/Tiny standard text layouts)
+            text = page.extract_text()
+            if text:
+                lines = [l.strip() for l in text.split('\n') if l.strip()]
+                for line in lines:
+                    if 'Separação de mercadorias' in line or 'Localização' in line:
+                        continue
+
+                    m_sku = sku_regex.search(line)
+                    if m_sku:
+                        sku_val = m_sku.group(1).upper()
+
+                        # Capture quantity looking for decimal + Pç: r'(\d+[\.,]\d+)\s*Pç'
+                        m_qtd = qtd_pc_regex.search(line)
+                        if m_qtd:
+                            qtd_val = parse_quantity_value(m_qtd.group(1))
+                        else:
+                            # Fallback generic decimal
+                            m_gen = re.search(r'(\d+(?:[\.,]\d+)?)\s*(?:Pç|un)?', line, re.IGNORECASE)
+                            qtd_val = parse_quantity_value(m_gen.group(1) if m_gen else 1)
+
+                        # Extract product title (text preceding the SKU)
+                        sku_pos = line.find(m_sku.group(0))
+                        if sku_pos > 0:
+                            prod_val = line[:sku_pos].strip()
+                        else:
+                            prod_val = line.replace(m_sku.group(0), '').strip()
+
+                        # Strip trailing quantity & location if present
+                        prod_val = re.sub(r'\s*\d+[\.,]\d+\s*Pç.*$', '', prod_val, flags=re.IGNORECASE).strip()
+                        if not prod_val:
+                            prod_val = f"Produto {sku_val}"
+
+                        item_key = f"{sku_val}_{qtd_val}_{prod_val}"
+                        if item_key not in seen_keys:
+                            seen_keys.add(item_key)
+                            items.append({
+                                'sku_original': sku_val,
+                                'produto_nome': prod_val,
+                                'quantidade': qtd_val,
+                                'data_pedido': datetime.now(timezone.utc).strftime('%Y-%m-%d'),
+                                'imagem_url': None,
+                                'parsed_sku': parse_sku_details(sku_val)
+                            })
 
     return items
 
