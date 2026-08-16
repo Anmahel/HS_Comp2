@@ -143,7 +143,6 @@ export function App() {
           <DashboardView
             stats={dashboardStats}
             onOpenCreate={openCreateModal}
-            onOpenDeduct={openDeductModal}
           />
         )}
 

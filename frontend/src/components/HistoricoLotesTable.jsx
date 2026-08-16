@@ -1,7 +1,7 @@
 import React from 'react';
 import {
-  FileText, Download, Share2, AlertTriangle, CheckCircle2,
-  XCircle, Clock, ShieldCheck, Printer, PackageCheck
+  AlertTriangle, CheckCircle2,
+  XCircle, Clock, Printer, PackageCheck
 } from 'lucide-react';
 import { api } from '../api';
 

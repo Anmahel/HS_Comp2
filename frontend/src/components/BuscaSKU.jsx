@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Sparkles, AlertCircle, CheckCircle2, AlertTriangle, XCircle, Shirt, Palette, Filter } from 'lucide-react';
+import { Search, Sparkles, Shirt, Palette } from 'lucide-react';
 import { api } from '../api';
 import { ItemVariantCard } from './ItemVariantCard';
 import { getStatusBadge } from '../utils/formatters';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Lock, Sparkles, Plus, AlertCircle, Shirt, Palette, ShieldAlert } from 'lucide-react';
+import { X, Sparkles, AlertCircle, Shirt, Palette } from 'lucide-react';
 import { generateSku } from '../utils/sku';
 import { FormularioPecaFields } from './FormularioPecaFields';
 import { FormularioEstampaFields } from './FormularioEstampaFields';

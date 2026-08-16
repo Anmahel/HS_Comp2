@@ -1,5 +1,5 @@
 import React from 'react';
-import { Palette, Info } from 'lucide-react';
+import { Info } from 'lucide-react';
 
 export function FormularioEstampaFields() {
   return (
