@@ -2,15 +2,19 @@ const API_BASE = '/api';
 
 async function request(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
-  const config = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
+  const isFormData = options.body instanceof FormData;
+
+  const headers = {
+    ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
+    ...options.headers,
   };
 
-  if (config.body && typeof config.body === 'object') {
+  const config = {
+    ...options,
+    headers,
+  };
+
+  if (!isFormData && config.body && typeof config.body === 'object') {
     config.body = JSON.stringify(config.body);
   }
 
@@ -76,6 +80,51 @@ export const api = {
     });
     return request(`/verificar-disponibilidade?${query.toString()}`);
   },
+
+  // Order Processing & Ingestion (RBAC)
+  previaPedidos: (body) => {
+    return request('/pedidos/previa', {
+      method: 'POST',
+      body,
+    });
+  },
+
+  procesarPedidos: (body, role = 'soporte', userName = 'Agatha') => {
+    return request('/pedidos/procesar', {
+      method: 'POST',
+      body,
+      headers: {
+        'X-User-Role': role,
+        'X-User-Name': userName,
+      },
+    });
+  },
+
+  getLotesPedidos: (params = {}) => {
+    const query = new URLSearchParams(params);
+    return request(`/pedidos/lotes?${query.toString()}`);
+  },
+
+  getLoteDetalhe: (id) => request(`/pedidos/lotes/${id}`),
+
+  cancelarLotePedido: (id, motivo, role = 'soporte', userName = 'Agatha') => {
+    return request(`/pedidos/lotes/${id}/cancelar`, {
+      method: 'POST',
+      body: { motivo },
+      headers: {
+        'X-User-Role': role,
+        'X-User-Name': userName,
+      },
+    });
+  },
+
+  getWhatsappShareLink: (loteId, phone = '') => {
+    const q = phone ? `?phone=${encodeURIComponent(phone)}` : '';
+    return request(`/pedidos/lotes/${loteId}/whatsapp-link${q}`);
+  },
+
+  getPdfImprentaUrl: (loteId) => `${API_BASE}/pedidos/lotes/${loteId}/pdf-imprenta`,
+  getPdfSeparacaoUrl: (loteId) => `${API_BASE}/pedidos/lotes/${loteId}/pdf-separacao`,
 
   // Analytics & Audit Trail
   getMovimentacoes: (params = {}) => {

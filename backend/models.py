@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, Integer, String, DateTime, ForeignKey, CheckConstraint,
+    Column, Integer, String, DateTime, Boolean, ForeignKey, CheckConstraint,
     UniqueConstraint, Index, func
 )
 from sqlalchemy.orm import relationship
@@ -246,3 +246,102 @@ class MovimentacaoEstoque(Base):
             'data_hora': self.data_hora.isoformat() if self.data_hora else None,
             'observacao': self.observacao
         }
+
+class LotePedido(Base):
+    __tablename__ = 'lotes_pedidos'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nome_arquivo = Column(String(255), nullable=False)
+    formato_origem = Column(String(50), nullable=False, default='CSV')
+    status = Column(String(50), nullable=False, default='PROCESSADO') # 'PROCESSADO' | 'CANCELADO'
+    total_itens = Column(Integer, nullable=False, default=0)
+    total_descontado_pecas = Column(Integer, nullable=False, default=0)
+    total_descontado_estampas = Column(Integer, nullable=False, default=0)
+    total_necessita_impressao = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    deleted_at = Column(DateTime, nullable=True)
+    motivo_cancelamento = Column(String(500), nullable=True)
+    usuario_responsavel = Column(String(100), default='Soporte / Agatha')
+
+    itens = relationship('ItemPedido', back_populates='lote', cascade='all, delete-orphan', lazy='joined')
+
+    def to_dict(self, include_items=False):
+        res = {
+            'id': self.id,
+            'nome_arquivo': self.nome_arquivo,
+            'formato_origem': self.formato_origem,
+            'status': self.status,
+            'total_itens': self.total_itens,
+            'total_descontado_pecas': self.total_descontado_pecas,
+            'total_descontado_estampas': self.total_descontado_estampas,
+            'total_necessita_impressao': self.total_necessita_impressao,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'is_deleted': self.is_deleted,
+            'deleted_at': self.deleted_at.isoformat() if self.deleted_at else None,
+            'motivo_cancelamento': self.motivo_cancelamento,
+            'usuario_responsavel': self.usuario_responsavel
+        }
+        if include_items and self.itens:
+            res['itens'] = [item.to_dict() for item in self.itens]
+        return res
+
+class ItemPedido(Base):
+    __tablename__ = 'itens_pedidos'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    lote_id = Column(Integer, ForeignKey('lotes_pedidos.id', ondelete='CASCADE'), nullable=False)
+    sku_original = Column(String(100), nullable=False)
+    produto_nome = Column(String(255), nullable=True)
+    quantidade_solicitada = Column(Integer, nullable=False, default=1)
+    quantidade_descontada_peca = Column(Integer, nullable=False, default=0)
+    quantidade_descontada_estampa = Column(Integer, nullable=False, default=0)
+    quantidade_necessita_impressao = Column(Integer, nullable=False, default=0)
+    data_pedido = Column(String(50), nullable=True)
+    imagem_url = Column(String(500), nullable=True)
+    tipo_item = Column(String(20), default='peca') # 'peca' | 'estampa'
+
+    brand_id = Column(Integer, ForeignKey('brands.id'), nullable=True)
+    design_id = Column(Integer, ForeignKey('designs.id'), nullable=True)
+    cor_id = Column(Integer, ForeignKey('cores.id'), nullable=True)
+    tipo_id = Column(Integer, ForeignKey('tipos.id'), nullable=True)
+    tamanho_id = Column(Integer, ForeignKey('tamanhos.id'), nullable=True)
+    peca_pronta_id = Column(Integer, ForeignKey('pecas_prontas.id'), nullable=True)
+    estampa_id = Column(Integer, ForeignKey('estampas.id'), nullable=True)
+
+    lote = relationship('LotePedido', back_populates='itens')
+    brand = relationship('Brand')
+    design = relationship('Design')
+    cor = relationship('Cor')
+    tipo = relationship('Tipo')
+    tamanho = relationship('Tamanho')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'lote_id': self.lote_id,
+            'sku_original': self.sku_original,
+            'produto_nome': self.produto_nome,
+            'quantidade_solicitada': self.quantidade_solicitada,
+            'quantidade_descontada_peca': self.quantidade_descontada_peca,
+            'quantidade_descontada_estampa': self.quantidade_descontada_estampa,
+            'quantidade_necessita_impressao': self.quantidade_necessita_impressao,
+            'data_pedido': self.data_pedido,
+            'imagem_url': self.imagem_url,
+            'tipo_item': self.tipo_item,
+            'brand_id': self.brand_id,
+            'brand_name': self.brand.name if self.brand else None,
+            'brand_slug': self.brand.slug if self.brand else None,
+            'design_id': self.design_id,
+            'nome_design': self.design.nome_design if self.design else None,
+            'codigo_estampa': self.design.codigo_estampa if self.design else None,
+            'cor_id': self.cor_id,
+            'cor': self.cor.cor if self.cor else None,
+            'tipo_id': self.tipo_id,
+            'tipo_codigo': self.tipo.codigo if self.tipo else None,
+            'tamanho_id': self.tamanho_id,
+            'tamanho': self.tamanho.tamanho if self.tamanho else None,
+            'peca_pronta_id': self.peca_pronta_id,
+            'estampa_id': self.estampa_id
+        }
+

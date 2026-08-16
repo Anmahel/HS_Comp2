@@ -1,15 +1,23 @@
 import re
 import os
 from datetime import datetime, timezone
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file, Response
 from flask_cors import CORS
 from sqlalchemy import create_engine, func, or_, and_, desc
 from sqlalchemy.orm import scoped_session, sessionmaker
 
 from config import config_by_name
 from database import Base, db_session
-from models import Brand, Cor, Design, SKU, Tamanho, Tipo, PecaPronta, Estampa, MovimentacaoEstoque
+from models import (
+    Brand, Cor, Design, SKU, Tamanho, Tipo,
+    PecaPronta, Estampa, MovimentacaoEstoque,
+    LotePedido, ItemPedido
+)
 from seed import seed_database
+from services.parser_service import parse_order_file, parse_sku_details
+from services.inventory_service import process_order_batch, rollback_order_batch
+from services.pdf_service import generate_imprenta_pdf, generate_separacao_pdf
+from services.notification_service import build_whatsapp_link, send_email_notification_hook
 
 def create_app(config_name='development'):
     app = Flask(__name__)
@@ -1061,6 +1069,298 @@ def create_app(config_name='development'):
             'top_designs': top_5_designs,
             'critical_items': critical_items
         })
+
+    # =========================================================================
+    # PEDIDOS, PROCESSAMENTO DE LOTES, RBAC & GERAÇÃO DE PDFS
+    # =========================================================================
+
+    @app.route('/api/pedidos/previa', methods=['POST'])
+    def previa_pedidos():
+        """
+        Parses uploaded file or JSON items and simulates the cascade deduction
+        without modifying database stock, for real-time frontend preview.
+        """
+        session = get_session()
+        try:
+            raw_items = []
+            filename = 'pedidos_previa.csv'
+
+            if 'file' in request.files:
+                uploaded_file = request.files['file']
+                filename = uploaded_file.filename or filename
+                raw_items = parse_order_file(uploaded_file, filename)
+            elif request.is_json:
+                data = request.get_json() or {}
+                raw_items = data.get('items', [])
+                filename = data.get('filename', filename)
+                for it in raw_items:
+                    if 'parsed_sku' not in it and 'sku_original' in it:
+                        it['parsed_sku'] = parse_sku_details(it['sku_original'])
+
+            if not raw_items:
+                return jsonify({'error': 'Nenhum item válido encontrado para prévia.'}), 400
+
+            # Simulate cascade against current stock
+            total_itens = 0
+            sim_pecas = 0
+            sim_estampas = 0
+            sim_impressao = 0
+            preview_rows = []
+
+            # Cache catalogs
+            cores = {c.cor.upper(): c for c in session.query(Cor).all()}
+            tipos = {t.codigo.upper(): t for t in session.query(Tipo).all()}
+            tamanhos = {t.tamanho.upper(): t for t in session.query(Tamanho).all()}
+            designs_by_code = {d.codigo_estampa.strip(): d for d in session.query(Design).all()}
+
+            for item in raw_items:
+                sku_orig = item.get('sku_original', '').strip().upper()
+                prod_nome = item.get('produto_nome', f'Produto {sku_orig}')
+                qtd = max(1, int(item.get('quantidade', 1)))
+                parsed = item.get('parsed_sku') or parse_sku_details(sku_orig)
+
+                cod_est = parsed.get('codigo_estampa')
+                cor_cod = parsed.get('cor_codigo')
+                tipo_cod = parsed.get('tipo_codigo')
+                tam_str = parsed.get('tamanho')
+
+                cor_obj = cores.get(cor_cod) if cor_cod else None
+                design_obj = designs_by_code.get(cod_est) if cod_est else None
+                tipo_obj = tipos.get(tipo_cod) if tipo_cod else None
+                tam_obj = tamanhos.get(tam_str) if tam_str else None
+
+                desc_peca = 0
+                desc_estampa = 0
+                req_imp = qtd
+
+                # Check PecaPronta
+                if design_obj and cor_obj and tipo_obj and tam_obj:
+                    peca = session.query(PecaPronta).filter(
+                        PecaPronta.design_id == design_obj.id,
+                        PecaPronta.cor_id == cor_obj.id,
+                        PecaPronta.tipo_id == tipo_obj.id,
+                        PecaPronta.tamanho_id == tam_obj.id
+                    ).first()
+                    if peca and peca.quantidade > 0:
+                        desc_peca = min(qtd, peca.quantidade)
+                        req_imp = qtd - desc_peca
+
+                # Check Estampa for remainder
+                if req_imp > 0 and design_obj and cor_obj:
+                    estampa = session.query(Estampa).filter(
+                        Estampa.design_id == design_obj.id,
+                        Estampa.cor_id == cor_obj.id
+                    ).first()
+                    if estampa and estampa.quantidade > 0:
+                        desc_estampa = min(req_imp, estampa.quantidade)
+                        req_imp -= desc_estampa
+
+                total_itens += qtd
+                sim_pecas += desc_peca
+                sim_estampas += desc_estampa
+                sim_impressao += req_imp
+
+                preview_rows.append({
+                    'sku_original': sku_orig,
+                    'produto_nome': prod_nome,
+                    'quantidade_solicitada': qtd,
+                    'quantidade_descontada_peca': desc_peca,
+                    'quantidade_descontada_estampa': desc_estampa,
+                    'quantidade_necessita_impressao': req_imp,
+                    'data_pedido': item.get('data_pedido'),
+                    'imagem_url': item.get('imagem_url')
+                })
+
+            return jsonify({
+                'filename': filename,
+                'total_itens': total_itens,
+                'total_descontado_pecas': sim_pecas,
+                'total_descontado_estampas': sim_estampas,
+                'total_necessita_impressao': sim_impressao,
+                'items': preview_rows
+            }), 200
+
+        except Exception as e:
+            return jsonify({'error': f'Falha ao gerar prévia: {str(e)}'}), 500
+
+    @app.route('/api/pedidos/procesar', methods=['POST'])
+    def procesar_pedidos():
+        """
+        Ingests order sheet (.csv, .xlsx, .pdf or JSON items), executes atomic
+        cascading inventory deduction and creates batch with PDF generation capabilities.
+        """
+        session = get_session()
+        user_role = request.headers.get('X-User-Role', 'soporte').lower()
+        user_name = request.headers.get('X-User-Name', 'Agatha')
+
+        # RBAC Check: Soporte, Jefe, and Admin can process orders
+        if user_role not in ['soporte', 'jefe', 'admin', 'ing']:
+            return jsonify({
+                'error': f'O perfil "{user_role}" não tem permissão para processar lotes de pedidos.'
+            }), 403
+
+        try:
+            raw_items = []
+            filename = 'pedidos.csv'
+
+            if 'file' in request.files:
+                uploaded_file = request.files['file']
+                filename = uploaded_file.filename or filename
+                raw_items = parse_order_file(uploaded_file, filename)
+            elif request.is_json:
+                data = request.get_json() or {}
+                raw_items = data.get('items', [])
+                filename = data.get('filename', filename)
+                for it in raw_items:
+                    if 'parsed_sku' not in it and 'sku_original' in it:
+                        it['parsed_sku'] = parse_sku_details(it['sku_original'])
+
+            if not raw_items:
+                return jsonify({'error': 'Nenhum item válido encontrado no arquivo ou dados fornecidos.'}), 400
+
+            lote = process_order_batch(
+                session=session,
+                raw_items=raw_items,
+                filename=filename,
+                user_role=user_role,
+                user_name=user_name
+            )
+
+            whatsapp_link = build_whatsapp_link(lote)
+
+            return jsonify({
+                'success': True,
+                'message': f'Lote #{lote.id} processado com sucesso!',
+                'lote': lote.to_dict(include_items=True),
+                'whatsapp_link': whatsapp_link,
+                'pdf_imprenta_url': f'/api/pedidos/lotes/{lote.id}/pdf-imprenta',
+                'pdf_separacao_url': f'/api/pedidos/lotes/{lote.id}/pdf-separacao'
+            }), 201
+
+        except ValueError as ve:
+            session.rollback()
+            return jsonify({'error': str(ve)}), 400
+        except Exception as e:
+            session.rollback()
+            return jsonify({'error': f'Erro interno ao processar lote: {str(e)}'}), 500
+
+    @app.route('/api/pedidos/lotes', methods=['GET'])
+    def get_lotes_pedidos():
+        """Returns list of processed order batches."""
+        session = get_session()
+        status = request.args.get('status')
+        include_deleted = request.args.get('include_deleted', 'false').lower() == 'true'
+
+        query = session.query(LotePedido)
+        if not include_deleted:
+            query = query.filter(LotePedido.is_deleted == False)
+        if status and status.lower() != 'all':
+            query = query.filter(func.lower(LotePedido.status) == status.lower())
+
+        lotes = query.order_by(desc(LotePedido.created_at)).all()
+        return jsonify([l.to_dict(include_items=False) for l in lotes]), 200
+
+    @app.route('/api/pedidos/lotes/<int:lote_id>', methods=['GET'])
+    def get_lote_detalhe(lote_id):
+        """Returns single batch with its items and quick actions."""
+        session = get_session()
+        lote = session.get(LotePedido, lote_id)
+        if not lote:
+            return jsonify({'error': 'Lote não encontrado.'}), 404
+
+        return jsonify({
+            'lote': lote.to_dict(include_items=True),
+            'whatsapp_link': build_whatsapp_link(lote),
+            'pdf_imprenta_url': f'/api/pedidos/lotes/{lote.id}/pdf-imprenta',
+            'pdf_separacao_url': f'/api/pedidos/lotes/{lote.id}/pdf-separacao'
+        }), 200
+
+    @app.route('/api/pedidos/lotes/<int:lote_id>/pdf-imprenta', methods=['GET'])
+    def download_pdf_imprenta(lote_id):
+        """Streams PDF 1 (Imprenta / Produção) for download or inline viewing."""
+        session = get_session()
+        lote = session.get(LotePedido, lote_id)
+        if not lote:
+            return jsonify({'error': 'Lote não encontrado.'}), 404
+
+        try:
+            pdf_bytes = generate_imprenta_pdf(lote)
+            response = Response(pdf_bytes, mimetype='application/pdf')
+            response.headers['Content-Disposition'] = f'inline; filename="HC_Imprenta_Lote_{lote_id}.pdf"'
+            return response
+        except Exception as e:
+            return jsonify({'error': f'Erro ao gerar PDF de imprenta: {str(e)}'}), 500
+
+    @app.route('/api/pedidos/lotes/<int:lote_id>/pdf-separacao', methods=['GET'])
+    def download_pdf_separacao(lote_id):
+        """Streams PDF 2 (Separação / Almoxarifado) for download or inline viewing."""
+        session = get_session()
+        lote = session.get(LotePedido, lote_id)
+        if not lote:
+            return jsonify({'error': 'Lote não encontrado.'}), 404
+
+        try:
+            pdf_bytes = generate_separacao_pdf(lote)
+            response = Response(pdf_bytes, mimetype='application/pdf')
+            response.headers['Content-Disposition'] = f'inline; filename="HC_Separacao_Lote_{lote_id}.pdf"'
+            return response
+        except Exception as e:
+            return jsonify({'error': f'Erro ao gerar PDF de separação: {str(e)}'}), 500
+
+    @app.route('/api/pedidos/lotes/<int:lote_id>/cancelar', methods=['POST'])
+    def cancelar_lote_pedido(lote_id):
+        """
+        Soft deletes order batch, requires mandatory 'motivo',
+        and restores all deducted inventory atomically with audit logging.
+        """
+        session = get_session()
+        user_role = request.headers.get('X-User-Role', 'soporte').lower()
+        user_name = request.headers.get('X-User-Name', 'Agatha')
+
+        # RBAC Check: Soporte, Jefe, and Admin can cancel batches
+        if user_role not in ['soporte', 'jefe', 'admin', 'ing']:
+            return jsonify({
+                'error': f'O perfil "{user_role}" não tem permissão para cancelar lotes de pedidos.'
+            }), 403
+
+        data = request.get_json() or {}
+        motivo = data.get('motivo', '').strip()
+
+        if not motivo:
+            return jsonify({
+                'error': 'O motivo do cancelamento é obrigatório para registrar a auditoria e estornar o estoque.'
+            }), 400
+
+        try:
+            lote = rollback_order_batch(
+                session=session,
+                lote_id=lote_id,
+                motivo=motivo,
+                user_name=user_name
+            )
+            return jsonify({
+                'success': True,
+                'message': f'Lote #{lote.id} cancelado com sucesso. O estoque foi estornado e registrado em auditoria.',
+                'lote': lote.to_dict(include_items=False)
+            }), 200
+        except ValueError as ve:
+            session.rollback()
+            return jsonify({'error': str(ve)}), 400
+        except Exception as e:
+            session.rollback()
+            return jsonify({'error': f'Erro ao estornar lote: {str(e)}'}), 500
+
+    @app.route('/api/pedidos/lotes/<int:lote_id>/whatsapp-link', methods=['GET'])
+    def get_whatsapp_share_link(lote_id):
+        """Generates WhatsApp click-to-chat share URL."""
+        session = get_session()
+        lote = session.get(LotePedido, lote_id)
+        if not lote:
+            return jsonify({'error': 'Lote não encontrado.'}), 404
+
+        phone = request.args.get('phone')
+        link = build_whatsapp_link(lote, phone)
+        return jsonify({'whatsapp_link': link}), 200
 
     # Seed route for development/demo convenience
     @app.route('/api/seed', methods=['POST'])

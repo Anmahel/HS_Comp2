@@ -8,9 +8,19 @@ export function useEstoque() {
     return localStorage.getItem('hc_theme') || 'dark';
   });
 
+  // Role-Based Access Control (RBAC) User state
+  // Roles: 'soporte' (Agatha), 'separacion', 'geral', 'jefe', 'admin'
+  const [userRole, setUserRoleState] = useState(() => {
+    return localStorage.getItem('hc_user_role') || 'soporte';
+  });
+
+  const [userName, setUserName] = useState(() => {
+    return localStorage.getItem('hc_user_name') || 'Agatha';
+  });
+
   // Navigation tab state
   const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('hc_active_tab') || 'verificador';
+    return localStorage.getItem('hc_active_tab') || 'pedidos';
   });
 
   // Global Brand filter state
@@ -33,9 +43,11 @@ export function useEstoque() {
   const [estampas, setEstampas] = useState([]);
   const [movimentacoes, setMovimentacoes] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
+  const [lotes, setLotes] = useState([]);
 
   // Loading & error flags
   const [loading, setLoading] = useState(false);
+  const [lotesLoading, setLotesLoading] = useState(false);
   const [catalogsLoaded, setCatalogsLoaded] = useState(false);
 
   // Form Modal state
@@ -47,6 +59,10 @@ export function useEstoque() {
   const [isDeductModalOpen, setIsDeductModalOpen] = useState(false);
   const [itemToDeduct, setItemToDeduct] = useState(null);
   const [deductCategory, setDeductCategory] = useState('peca');
+
+  // Cancel Lote Modal state
+  const [isCancelLoteModalOpen, setIsCancelLoteModalOpen] = useState(false);
+  const [loteToCancel, setLoteToCancel] = useState(null);
 
   // Apply theme to document
   useEffect(() => {
@@ -60,7 +76,7 @@ export function useEstoque() {
     localStorage.setItem('hc_theme', theme);
   }, [theme]);
 
-  // Persist tab & brand
+  // Persist tab, brand, and role
   useEffect(() => {
     localStorage.setItem('hc_active_tab', activeTab);
   }, [activeTab]);
@@ -69,8 +85,32 @@ export function useEstoque() {
     localStorage.setItem('hc_selected_brand', selectedBrand);
   }, [selectedBrand]);
 
+  useEffect(() => {
+    localStorage.setItem('hc_user_role', userRole);
+  }, [userRole]);
+
+  useEffect(() => {
+    localStorage.setItem('hc_user_name', userName);
+  }, [userName]);
+
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
+  const setUserRole = (role, name = null) => {
+    setUserRoleState(role);
+    if (name) {
+      setUserName(name);
+    } else {
+      const defaultNames = {
+        soporte: 'Agatha',
+        separacion: 'Equipe Separação',
+        geral: 'Colaborador',
+        jefe: 'Diretoria / Gestão',
+        admin: 'Engenharia / Admin',
+      };
+      setUserName(defaultNames[role] || 'Usuário');
+    }
   };
 
   // Fetch all catalogs
@@ -153,14 +193,32 @@ export function useEstoque() {
     }
   }, []);
 
+  // Fetch order batches
+  const fetchLotes = useCallback(async () => {
+    setLotesLoading(true);
+    try {
+      const data = await api.getLotesPedidos({ include_deleted: 'true' });
+      setLotes(data || []);
+    } catch (err) {
+      toast.error(`Erro ao carregar histórico de lotes: ${err.message}`);
+    } finally {
+      setLotesLoading(false);
+    }
+  }, []);
+
   // Refresh current view data
   const refreshCurrentView = useCallback(() => {
     fetchCatalogs();
+    if (activeTab === 'pedidos') {
+      fetchLotes();
+      fetchPecas();
+      fetchEstampas();
+    }
     if (activeTab === 'pecas') fetchPecas();
     if (activeTab === 'estampas') fetchEstampas();
     if (activeTab === 'dashboard') fetchDashboardStats();
     if (activeTab === 'movimentacoes') fetchMovimentacoes();
-  }, [activeTab, fetchCatalogs, fetchPecas, fetchEstampas, fetchDashboardStats, fetchMovimentacoes]);
+  }, [activeTab, fetchCatalogs, fetchLotes, fetchPecas, fetchEstampas, fetchDashboardStats, fetchMovimentacoes]);
 
   // Initial load
   useEffect(() => {
@@ -198,6 +256,16 @@ export function useEstoque() {
   const closeDeductModal = () => {
     setIsDeductModalOpen(false);
     setItemToDeduct(null);
+  };
+
+  const openCancelLoteModal = (lote) => {
+    setLoteToCancel(lote);
+    setIsCancelLoteModalOpen(true);
+  };
+
+  const closeCancelLoteModal = () => {
+    setLoteToCancel(null);
+    setIsCancelLoteModalOpen(false);
   };
 
   // Save Item (Create / Update)
@@ -249,6 +317,44 @@ export function useEstoque() {
     }
   };
 
+  // Process Batch of Orders
+  const processarPedidosBatch = async (fileOrData) => {
+    try {
+      let res;
+      if (fileOrData instanceof FormData) {
+        res = await api.procesarPedidos(fileOrData, userRole, userName);
+      } else {
+        res = await api.procesarPedidos(fileOrData, userRole, userName);
+      }
+      toast.success(res.message || `Lote #${res.lote?.id} processado com sucesso!`);
+      fetchLotes();
+      fetchPecas();
+      fetchEstampas();
+      fetchMovimentacoes();
+      return res;
+    } catch (err) {
+      toast.error(err.message);
+      throw err;
+    }
+  };
+
+  // Cancel Batch & Rollback Stock
+  const cancelarLoteBatch = async (loteId, motivo) => {
+    try {
+      const res = await api.cancelarLotePedido(loteId, motivo, userRole, userName);
+      toast.success(res.message || 'Lote cancelado e estoque estornado com sucesso!');
+      closeCancelLoteModal();
+      fetchLotes();
+      fetchPecas();
+      fetchEstampas();
+      fetchMovimentacoes();
+      return res;
+    } catch (err) {
+      toast.error(err.message);
+      throw err;
+    }
+  };
+
   // Delete Item
   const deleteItem = async (id, category = 'peca') => {
     try {
@@ -271,6 +377,9 @@ export function useEstoque() {
   return {
     theme,
     toggleTheme,
+    userRole,
+    userName,
+    setUserRole,
     activeTab,
     setActiveTab,
     selectedBrand,
@@ -281,7 +390,9 @@ export function useEstoque() {
     estampas,
     movimentacoes,
     dashboardStats,
+    lotes,
     loading,
+    lotesLoading,
     // Modals
     isFormModalOpen,
     formCategory,
@@ -298,6 +409,14 @@ export function useEstoque() {
     closeDeductModal,
     deductStock,
     deleteItem,
+    // Batches & Orders
+    fetchLotes,
+    processarPedidosBatch,
+    cancelarLoteBatch,
+    isCancelLoteModalOpen,
+    loteToCancel,
+    openCancelLoteModal,
+    closeCancelLoteModal,
     // Refresh
     fetchPecas,
     fetchEstampas,

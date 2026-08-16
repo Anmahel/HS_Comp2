@@ -3,6 +3,7 @@ import { Toaster } from 'sonner';
 import { useEstoque } from './hooks/useEstoque';
 import { Header } from './components/Header';
 import { NavigationTabs } from './components/NavigationTabs';
+import { ProcessadorPedidosView } from './components/ProcessadorPedidosView';
 import { BuscaSKU } from './components/BuscaSKU';
 import { DashboardView } from './components/DashboardView';
 import { TabelaPecasProntas } from './components/TabelaPecasProntas';
@@ -10,11 +11,15 @@ import { TabelaEstampas } from './components/TabelaEstampas';
 import { TabelaMovimentacoes } from './components/TabelaMovimentacoes';
 import { FormularioEstoqueModal } from './components/FormularioEstoqueModal';
 import { ModalUsarEstoque } from './components/ModalUsarEstoque';
+import { CancelarLoteModal } from './components/CancelarLoteModal';
 
 export function App() {
   const {
     theme,
     toggleTheme,
+    userRole,
+    userName,
+    setUserRole,
     activeTab,
     setActiveTab,
     selectedBrand,
@@ -24,7 +29,9 @@ export function App() {
     estampas,
     movimentacoes,
     dashboardStats,
+    lotes,
     loading,
+    lotesLoading,
     // Form Modal
     isFormModalOpen,
     formCategory,
@@ -41,6 +48,13 @@ export function App() {
     closeDeductModal,
     deductStock,
     deleteItem,
+    // Batch Orders & PDFs
+    processarPedidosBatch,
+    cancelarLoteBatch,
+    isCancelLoteModalOpen,
+    loteToCancel,
+    openCancelLoteModal,
+    closeCancelLoteModal,
   } = useEstoque();
 
   // Keyboard Shortcuts (Ctrl+K / Cmd+K and Esc)
@@ -64,6 +78,7 @@ export function App() {
       if (e.key === 'Escape') {
         if (isFormModalOpen) closeFormModal();
         if (isDeductModalOpen) closeDeductModal();
+        if (isCancelLoteModalOpen) closeCancelLoteModal();
       }
     };
 
@@ -72,7 +87,7 @@ export function App() {
       window.removeEventListener('keydown', handleKeyDown);
       if (animFrameId) cancelAnimationFrame(animFrameId);
     };
-  }, [isFormModalOpen, isDeductModalOpen, setActiveTab, closeFormModal, closeDeductModal]);
+  }, [isFormModalOpen, isDeductModalOpen, isCancelLoteModalOpen, setActiveTab, closeFormModal, closeDeductModal, closeCancelLoteModal]);
 
   return (
     <div className="min-h-screen flex flex-col bg-dark-900 text-slate-100 selection:bg-rose-500/30 selection:text-rose-200">
@@ -87,6 +102,8 @@ export function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
         onOpenCreate={openCreateModal}
+        userRole={userRole}
+        onSelectRole={setUserRole}
       />
 
       {/* Navigation Tabs Bar */}
@@ -94,6 +111,7 @@ export function App() {
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         counts={{
+          lotes: lotes.length,
           pecas: pecasProntas.length,
           estampas: estampas.length,
           critical: dashboardStats ? dashboardStats.total_criticos : 0,
@@ -102,6 +120,17 @@ export function App() {
 
       {/* Main Content View */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {activeTab === 'pedidos' && (
+          <ProcessadorPedidosView
+            lotes={lotes}
+            lotesLoading={lotesLoading}
+            userRole={userRole}
+            userName={userName}
+            onProcessBatch={processarPedidosBatch}
+            onOpenCancelModal={openCancelLoteModal}
+          />
+        )}
+
         {activeTab === 'verificador' && (
           <BuscaSKU
             catalogs={catalogs}
@@ -169,6 +198,16 @@ export function App() {
         />
       )}
 
+      {isCancelLoteModalOpen && (
+        <CancelarLoteModal
+          isOpen={isCancelLoteModalOpen}
+          key={`cancel-lote-${loteToCancel ? loteToCancel.id : 'modal'}`}
+          lote={loteToCancel}
+          onClose={closeCancelLoteModal}
+          onConfirm={cancelarLoteBatch}
+        />
+      )}
+
       {/* Footer */}
       <footer className="border-t border-slate-800/80 bg-dark-900/60 py-4 text-center text-xs text-slate-500 font-mono">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
@@ -188,3 +227,4 @@ export function App() {
 }
 
 export default App;
+

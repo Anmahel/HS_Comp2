@@ -1,5 +1,13 @@
 import React from 'react';
-import { Layers, Plus, Sun, Moon, Sparkles } from 'lucide-react';
+import { Layers, Plus, Sun, Moon, ShieldCheck, User } from 'lucide-react';
+
+const ROLES = [
+  { id: 'soporte', label: 'Soporte (Agatha)', iconColor: 'text-rose-400' },
+  { id: 'separacion', label: 'Separação', iconColor: 'text-indigo-400' },
+  { id: 'geral', label: 'Geral', iconColor: 'text-emerald-400' },
+  { id: 'jefe', label: 'Jefe / Diretoria', iconColor: 'text-amber-400' },
+  { id: 'admin', label: 'Admin / Eng', iconColor: 'text-purple-400' },
+];
 
 export function Header({
   brands = [],
@@ -8,6 +16,8 @@ export function Header({
   theme,
   onToggleTheme,
   onOpenCreate,
+  userRole = 'soporte',
+  onSelectRole,
 }) {
   return (
     <header className="border-b border-slate-800 bg-dark-900/80 backdrop-blur-md sticky top-0 z-30 transition-colors">
@@ -38,7 +48,7 @@ export function Header({
             type="button"
             data-testid="brand-filter-all"
             onClick={() => onSelectBrand('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
               selectedBrand === 'all'
                 ? 'bg-gradient-to-r from-rose-600 to-indigo-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
@@ -57,7 +67,7 @@ export function Header({
                 type="button"
                 data-testid={`brand-filter-${b.slug.toLowerCase()}`}
                 onClick={() => onSelectBrand(b.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap ${
                   isSelected
                     ? isCR
                       ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
@@ -79,8 +89,28 @@ export function Header({
           })}
         </div>
 
-        {/* Action Controls */}
+        {/* Action Controls & Role Switcher */}
         <div className="flex items-center gap-2.5 self-end md:self-auto">
+          {/* RBAC Role Selector */}
+          <div className="flex items-center gap-1.5 bg-dark-800 px-2.5 py-1 rounded-xl border border-slate-700/60 text-xs">
+            <User className="h-3.5 w-3.5 text-rose-400" />
+            <label htmlFor="role-select" className="sr-only">Selecionar Perfil RBAC</label>
+            <select
+              id="role-select"
+              data-testid="select-user-role"
+              aria-label="Selecionar Perfil RBAC"
+              value={userRole}
+              onChange={(e) => onSelectRole && onSelectRole(e.target.value)}
+              className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer"
+            >
+              {ROLES.map((r) => (
+                <option key={r.id} value={r.id} className="bg-dark-900 text-white">
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Dark / Light Toggle */}
           <button
             type="button"
@@ -100,7 +130,7 @@ export function Header({
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white text-xs font-semibold shadow-lg shadow-rose-600/25 transition-colors active:scale-95"
           >
             <Plus className="h-4 w-4" />
-            <span>Cadastrar Item</span>
+            <span className="hidden sm:inline">Cadastrar Item</span>
           </button>
         </div>
       </div>
