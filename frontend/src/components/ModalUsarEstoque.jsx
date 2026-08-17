@@ -122,7 +122,7 @@ export function ModalUsarEstoque({
               {Math.max(0, maxAvailable - quantidade)} un
             </span>
           </div>
-
+          {/* un nuevo cambio */}
           {/* Footer Buttons */}
           <div className="flex items-center justify-end gap-2 pt-2">
             <button
