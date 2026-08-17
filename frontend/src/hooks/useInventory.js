@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { api } from '../api';
 
-export function useInventory({ selectedBrand = 'all', onRefreshCatalogs } = {}) {
+export function useInventory({ selectedBrand = 'all', onRefreshCatalogs, onInventoryChange } = {}) {
   const [pecasProntas, setPecasProntas] = useState([]);
   const [estampas, setEstampas] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -66,6 +66,9 @@ export function useInventory({ selectedBrand = 'all', onRefreshCatalogs } = {}) 
       if (onRefreshCatalogs) {
         onRefreshCatalogs();
       }
+      if (onInventoryChange) {
+        onInventoryChange();
+      }
       return true;
     } catch (err) {
       toast.error(err.message);
@@ -84,6 +87,9 @@ export function useInventory({ selectedBrand = 'all', onRefreshCatalogs } = {}) 
       toast.success(res.message || `Baixa de ${quantity} unidade(s) realizada!`);
       if (category === 'peca') fetchPecas();
       else fetchEstampas();
+      if (onInventoryChange) {
+        onInventoryChange();
+      }
       return true;
     } catch (err) {
       toast.error(err.message);
@@ -102,6 +108,9 @@ export function useInventory({ selectedBrand = 'all', onRefreshCatalogs } = {}) 
         await api.deleteEstampa(id);
         toast.success('Estampa excluída do estoque');
         fetchEstampas();
+      }
+      if (onInventoryChange) {
+        onInventoryChange();
       }
       return true;
     } catch (err) {

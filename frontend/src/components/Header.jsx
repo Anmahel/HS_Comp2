@@ -1,5 +1,6 @@
 import React from 'react';
-import { Layers, Plus, Sun, Moon, ShieldCheck, User } from 'lucide-react';
+import { Plus, Sun, Moon, ShieldCheck, User } from 'lucide-react';
+import crLogo from '../Static/img/CR1_clean.png';
 
 const ROLES = [
   { id: 'soporte', label: 'Soporte (Agatha)', iconColor: 'text-rose-400' },
@@ -24,21 +25,18 @@ export function Header({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         {/* Logo & Title */}
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-rose-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-rose-600/20 ring-1 ring-white/20">
-            <Layers className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5">
-                HC_comp
-                <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-mono font-medium border border-rose-500/30">
-                  v2.0 PRO
-                </span>
-              </h1>
-            </div>
-            <p className="text-xs text-slate-400">
-              Controle de Estoque & Peças Prontas / Estampas
-            </p>
+          <img
+            src={crLogo}
+            alt="Clube Rock"
+            className="h-8 w-auto object-contain shrink-0"
+          />
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-1.5">
+              HC_comp
+              <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-mono font-medium border border-rose-500/30">
+                v2.0 PRO
+              </span>
+            </h1>
           </div>
         </div>
 
@@ -48,11 +46,10 @@ export function Header({
             type="button"
             data-testid="brand-filter-all"
             onClick={() => onSelectBrand('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
-              selectedBrand === 'all'
-                ? 'bg-gradient-to-r from-rose-600 to-indigo-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${selectedBrand === 'all'
+              ? 'bg-gradient-to-r from-rose-600 to-indigo-600 text-white shadow-md'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
           >
             Todas as Marcas
           </button>
@@ -67,20 +64,18 @@ export function Header({
                 type="button"
                 data-testid={`brand-filter-${b.slug.toLowerCase()}`}
                 onClick={() => onSelectBrand(b.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                  isSelected
-                    ? isCR
-                      ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
-                      : isRN
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap ${isSelected
+                  ? isCR
+                    ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                    : isRN
                       ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
                       : 'bg-indigo-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                }`}
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
               >
                 <span
-                  className={`w-2 h-2 rounded-full ${
-                    isCR ? 'bg-rose-400' : isRN ? 'bg-blue-400' : 'bg-emerald-400'
-                  }`}
+                  className={`w-2 h-2 rounded-full ${isCR ? 'bg-rose-400' : isRN ? 'bg-blue-400' : 'bg-emerald-400'
+                    }`}
                 />
                 {b.name}
                 <span className="text-[10px] opacity-75 font-mono">({b.slug})</span>

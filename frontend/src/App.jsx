@@ -55,6 +55,7 @@ export function App() {
     loteToCancel,
     openCancelLoteModal,
     closeCancelLoteModal,
+    inventoryVersion,
   } = useEstoque();
 
   // Keyboard Shortcuts (Ctrl+K / Cmd+K and Esc)
@@ -136,6 +137,7 @@ export function App() {
             catalogs={catalogs}
             selectedBrand={selectedBrand}
             onOpenDeduct={openDeductModal}
+            inventoryVersion={inventoryVersion}
           />
         )}
 

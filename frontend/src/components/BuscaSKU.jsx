@@ -8,6 +8,7 @@ export function BuscaSKU({
   catalogs = {},
   selectedBrand,
   onOpenDeduct,
+  inventoryVersion = 0,
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCor, setSelectedCor] = useState('');
@@ -69,6 +70,17 @@ export function BuscaSKU({
 
     return () => clearTimeout(handler);
   }, [searchTerm, selectedCor, selectedTipo, selectedBrand, performSearch]);
+
+  // Real-time inventory sync: auto-refresh search results when stock changes
+  useEffect(() => {
+    if (inventoryVersion > 0 && hasSearched) {
+      const isBrandFiltered = selectedBrand && selectedBrand !== 'all';
+      const trimmedTerm = searchTerm.trim();
+      if (trimmedTerm.length > 0 || selectedCor || selectedTipo || isBrandFiltered) {
+        performSearch(trimmedTerm, selectedCor, selectedTipo);
+      }
+    }
+  }, [inventoryVersion]);
 
   const statusBadge = result ? getStatusBadge(result.status) : null;
 

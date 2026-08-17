@@ -149,27 +149,37 @@ class PecaPronta(Base):
 
     def to_dict(self):
         sku_str = self.sku.sku if self.sku else None
-        if not sku_str and self.brand and self.tipo and self.design and self.cor and self.tamanho:
-            sku_str = f"{self.brand.slug}-{self.tipo.codigo}-{self.design.codigo_estampa}-{self.cor.cor}-{self.tamanho.tamanho}"
+        cor_code = self.cor.cor if self.cor else None
+        cor_name = self.cor.nome if self.cor else cor_code
+        brand_slug = self.brand.slug if self.brand else None
+        brand_name = self.brand.name if self.brand else None
+        tipo_code = self.tipo.codigo if self.tipo else None
+        tipo_name = self.tipo.nome if self.tipo else None
+        design_code = self.design.codigo_estampa if self.design else None
+        design_name = self.design.nome_design if self.design else None
+        tam_code = self.tamanho.tamanho if self.tamanho else None
+
+        if not sku_str and brand_slug and tipo_code and design_code and cor_code and tam_code:
+            sku_str = f"{brand_slug}-{tipo_code}-{design_code}-{cor_code}-{tam_code}"
 
         return {
             'id': self.id,
             'sku_id': self.sku_id,
             'sku': sku_str,
             'tipo_id': self.tipo_id,
-            'tipo_codigo': self.tipo.codigo if self.tipo else None,
-            'tipo_nome': self.tipo.nome if self.tipo else None,
+            'tipo_codigo': tipo_code,
+            'tipo_nome': tipo_name,
             'design_id': self.design_id,
-            'nome_design': self.design.nome_design if self.design else None,
-            'codigo_estampa': self.design.codigo_estampa if self.design else None,
+            'nome_design': design_name,
+            'codigo_estampa': design_code,
             'cor_id': self.cor_id,
-            'cor': self.cor.cor if self.cor else None,
-            'cor_nome': self.cor.nome if self.cor else None,
+            'cor': cor_code,
+            'cor_nome': cor_name,
             'tamanho_id': self.tamanho_id,
-            'tamanho': self.tamanho.tamanho if self.tamanho else None,
+            'tamanho': tam_code,
             'brand_id': self.brand_id,
-            'brand_name': self.brand.name if self.brand else None,
-            'brand_slug': self.brand.slug if self.brand else None,
+            'brand_name': brand_name,
+            'brand_slug': brand_slug,
             'quantidade': self.quantidade,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
@@ -200,20 +210,26 @@ class Estampa(Base):
     def to_dict(self):
         cod = self.codigo_estampa or (self.design.codigo_estampa if self.design else None)
         sku_str = self.sku.sku if self.sku else None
-        if not sku_str and self.brand and self.cor and cod:
-            sku_str = f"{self.brand.slug}-EST-{cod}-{self.cor.cor}"
+        cor_code = self.cor.cor if self.cor else None
+        cor_name = self.cor.nome if self.cor else cor_code
+        brand_slug = self.brand.slug if self.brand else None
+        brand_name = self.brand.name if self.brand else None
+        design_name = self.design.nome_design if self.design else None
+
+        if not sku_str and brand_slug and cor_code and cod:
+            sku_str = f"{brand_slug}-EST-{cod}-{cor_code}"
 
         return {
             'id': self.id,
             'codigo_estampa': cod,
             'design_id': self.design_id,
-            'nome_design': self.design.nome_design if self.design else None,
+            'nome_design': design_name,
             'cor_id': self.cor_id,
-            'cor': self.cor.cor if self.cor else None,
-            'cor_nome': self.cor.nome if self.cor else None,
+            'cor': cor_code,
+            'cor_nome': cor_name,
             'brand_id': self.brand_id,
-            'brand_name': self.brand.name if self.brand else None,
-            'brand_slug': self.brand.slug if self.brand else None,
+            'brand_name': brand_name,
+            'brand_slug': brand_slug,
             'sku_id': self.sku_id,
             'sku': sku_str,
             'quantidade': self.quantidade,

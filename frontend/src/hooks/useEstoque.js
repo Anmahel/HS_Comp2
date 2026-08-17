@@ -35,6 +35,13 @@ export function useEstoque() {
   const [movimentacoes, setMovimentacoes] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
 
+  // Global Inventory Mutation Version for real-time reactivity
+  const [inventoryVersion, setInventoryVersion] = useState(0);
+
+  const notifyInventoryChange = useCallback(() => {
+    setInventoryVersion((v) => v + 1);
+  }, []);
+
   // Sub-hooks
   const { catalogs, catalogsLoaded, fetchCatalogs } = useCatalogs();
 
@@ -52,6 +59,7 @@ export function useEstoque() {
   } = useInventory({
     selectedBrand,
     onRefreshCatalogs: fetchCatalogs,
+    onInventoryChange: notifyInventoryChange,
   });
 
   // Fetch audit trail
@@ -78,7 +86,8 @@ export function useEstoque() {
     fetchPecas();
     fetchEstampas();
     fetchMovimentacoes();
-  }, [fetchPecas, fetchEstampas, fetchMovimentacoes]);
+    notifyInventoryChange();
+  }, [fetchPecas, fetchEstampas, fetchMovimentacoes, notifyInventoryChange]);
 
   const {
     lotes,
@@ -239,5 +248,6 @@ export function useEstoque() {
     fetchMovimentacoes,
     fetchDashboardStats,
     refreshCurrentView,
+    inventoryVersion,
   };
 }
