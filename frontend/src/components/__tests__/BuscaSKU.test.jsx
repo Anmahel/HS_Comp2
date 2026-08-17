@@ -60,4 +60,60 @@ describe('BuscaSKU Component Tests', () => {
       expect(screen.getByText('CR-CM-001-PRE-M')).toBeInTheDocument();
     });
   });
+
+  it('filters by color and type dropdowns and allows clearing filters', async () => {
+    api.verificarDisponibilidade.mockResolvedValueOnce({
+      status: 'EM_ESTOQUE',
+      status_label: 'Pronta Entrega',
+      status_description: '8 peça(s) pronta(s) disponível(is)',
+      total_pecas: 8,
+      total_estampas: 0,
+      extracted: { cor: 'PRE', tipo: 'CM' },
+      pecas_prontas: [
+        {
+          id: 2,
+          sku: 'CR-CM-001-PRE-G',
+          nome_design: 'Rock Vintage',
+          brand_slug: 'CR',
+          cor: 'PRE',
+          tamanho: 'G',
+          tipo_codigo: 'CM',
+          quantidade: 8,
+        },
+      ],
+      estampas: [],
+    });
+
+    render(
+      <BuscaSKU
+        catalogs={mockCatalogs}
+        selectedBrand="all"
+        onOpenDeduct={() => {}}
+      />
+    );
+
+    const corSelect = screen.getByLabelText(/Filtrar por Cor/i);
+    const tipoSelect = screen.getByLabelText(/Filtrar por Tipo/i);
+
+    fireEvent.change(corSelect, { target: { value: 'PRE' } });
+    fireEvent.change(tipoSelect, { target: { value: 'CM' } });
+
+    await waitFor(() => {
+      expect(api.verificarDisponibilidade).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cor: 'PRE',
+          tipo: 'CM',
+        })
+      );
+      expect(screen.getByText('CR-CM-001-PRE-G')).toBeInTheDocument();
+      expect(screen.getByText(/Filtros ativos:/i)).toBeInTheDocument();
+    });
+
+    // Clear all filters button
+    const clearBtn = screen.getByText(/Limpar todos/i);
+    fireEvent.click(clearBtn);
+
+    expect(corSelect.value).toBe('');
+    expect(tipoSelect.value).toBe('');
+  });
 });

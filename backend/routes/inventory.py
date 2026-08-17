@@ -569,10 +569,14 @@ def verificar_disponibilidade():
     session = get_session()
     raw_query = request.args.get('sku', '').strip()
     brand_prefix = request.args.get('brand_prefix', '').strip().upper()
+    query_cor = request.args.get('cor', '').strip().upper()
+    query_tipo = request.args.get('tipo', '').strip().upper()
 
-    if not raw_query:
+    if not raw_query and not brand_prefix and not query_cor and not query_tipo:
         return jsonify({
             'status': 'SEM_ESTOQUE',
+            'status_label': 'Sem Termo',
+            'status_description': 'Nenhum termo ou filtro de busca fornecido',
             'extracted': {},
             'pecas_prontas': [],
             'estampas': [],
@@ -583,17 +587,17 @@ def verificar_disponibilidade():
 
     # Pattern 1: Exact structured SKU -> CR-CM-001-PRE-M
     exact_pattern = r'^([A-Z]{2,4})-([A-Z]{2,4})-(\d{3,4})-([A-Z]{3,4})-([A-Z0-9]+)$'
-    match_exact = re.match(exact_pattern, raw_query.upper())
+    match_exact = re.match(exact_pattern, raw_query.upper()) if raw_query else None
 
     # Pattern 2: Merged code + size -> "001M", "001-M", "001 M", "006G1"
     merged_pattern = r'(\d{3,4})\s*[-_]?\s*([A-Z0-9]{1,3})'
-    match_merged = re.search(merged_pattern, raw_query.upper())
+    match_merged = re.search(merged_pattern, raw_query.upper()) if raw_query else None
 
     extracted_code = None
     extracted_size = None
     extracted_brand = brand_prefix or None
-    extracted_cor = None
-    extracted_tipo = None
+    extracted_cor = query_cor or None
+    extracted_tipo = query_tipo or None
 
     if match_exact:
         extracted_brand = match_exact.group(1)
@@ -604,21 +608,22 @@ def verificar_disponibilidade():
     elif match_merged:
         extracted_code = match_merged.group(1)
         extracted_size = match_merged.group(2)
-    else:
+    elif raw_query:
         # Fallback: extract standalone 3-4 digit code
         code_match = re.search(r'\b(\d{3,4})\b', raw_query)
         if code_match:
             extracted_code = code_match.group(1)
 
     # Query Peças Prontas
-    pecas_query = session.query(PecaPronta).join(PecaPronta.design).filter(PecaPronta.quantidade > 0)
+    pecas_query = session.query(PecaPronta).filter(PecaPronta.quantidade > 0)
     if extracted_code:
-        pecas_query = pecas_query.filter(Design.codigo_estampa == extracted_code)
-    else:
-        pecas_query = pecas_query.filter(
+        pecas_query = pecas_query.join(PecaPronta.design).filter(Design.codigo_estampa == extracted_code)
+    elif raw_query:
+        pecas_query = pecas_query.join(PecaPronta.design).outerjoin(PecaPronta.sku).filter(
             or_(
                 Design.nome_design.ilike(f"%{raw_query}%"),
-                Design.codigo_estampa.ilike(f"%{raw_query}%")
+                Design.codigo_estampa.ilike(f"%{raw_query}%"),
+                SKU.sku.ilike(f"%{raw_query}%")
             )
         )
 
@@ -635,16 +640,18 @@ def verificar_disponibilidade():
     total_pecas = sum(p.quantidade for p in pecas_encontradas)
 
     # Query Estampas
-    estampas_query = session.query(Estampa).join(Estampa.design).filter(Estampa.quantidade > 0)
+    estampas_query = session.query(Estampa).filter(Estampa.quantidade > 0)
     if extracted_code:
-        estampas_query = estampas_query.filter(Design.codigo_estampa == extracted_code)
-    else:
-        estampas_query = estampas_query.filter(
+        estampas_query = estampas_query.join(Estampa.design).filter(Design.codigo_estampa == extracted_code)
+    elif raw_query:
+        estampas_query = estampas_query.join(Estampa.design).outerjoin(Estampa.sku).filter(
             or_(
                 Design.nome_design.ilike(f"%{raw_query}%"),
-                Design.codigo_estampa.ilike(f"%{raw_query}%")
+                Design.codigo_estampa.ilike(f"%{raw_query}%"),
+                SKU.sku.ilike(f"%{raw_query}%")
             )
         )
+
     if extracted_brand:
         estampas_query = estampas_query.join(Estampa.brand).filter(Brand.slug == extracted_brand)
     if extracted_cor:
@@ -653,16 +660,24 @@ def verificar_disponibilidade():
     estampas_encontradas = estampas_query.all()
     total_estampas = sum(e.quantidade for e in estampas_encontradas)
 
-    # Determine availability status
+    # Determine availability status and descriptions
     if total_pecas > 0:
         status = 'EM_ESTOQUE'
+        status_label = 'Pronta Entrega'
+        status_description = f'{total_pecas} peça(s) pronta(s) em estoque disponível(is).'
     elif total_estampas > 0:
         status = 'ESTAMPAR'
+        status_label = 'Necessita Estampar'
+        status_description = f'Sem peças prontas. {total_estampas} estampa(s) avulsa(s) pronta(s) para estampar.'
     else:
         status = 'SEM_ESTOQUE'
+        status_label = 'Sem Estoque'
+        status_description = 'Nenhuma peça pronta ou estampa avulsa disponível para os filtros selecionados.'
 
     return jsonify({
         'status': status,
+        'status_label': status_label,
+        'status_description': status_description,
         'query': raw_query,
         'extracted': {
             'code': extracted_code,

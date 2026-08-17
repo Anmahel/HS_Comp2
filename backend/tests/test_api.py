@@ -515,6 +515,31 @@ def test_verificar_disponibilidade_brand_filter(client):
     for p in data['pecas_prontas']:
         assert p['brand_slug'] == 'CR'
 
+def test_verificar_disponibilidade_cor_filter_only(client):
+    res = client.get('/api/verificar-disponibilidade?cor=PRE')
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data['total_pecas'] > 0
+    for p in data['pecas_prontas']:
+        assert p['cor'] == 'PRE'
+
+def test_verificar_disponibilidade_tipo_filter_only(client):
+    res = client.get('/api/verificar-disponibilidade?tipo=CM')
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data['total_pecas'] > 0
+    for p in data['pecas_prontas']:
+        assert p['tipo_codigo'] == 'CM'
+
+def test_verificar_disponibilidade_combined_filters(client):
+    res = client.get('/api/verificar-disponibilidade?sku=001&cor=PRE&tipo=CM')
+    assert res.status_code == 200
+    data = res.get_json()
+    for p in data['pecas_prontas']:
+        assert p['codigo_estampa'] == '001'
+        assert p['cor'] == 'PRE'
+        assert p['tipo_codigo'] == 'CM'
+
 # ----------------------------------------------------------------------
 # 6. ANALYTICS & AUDIT ENDPOINTS
 # ----------------------------------------------------------------------

@@ -20,7 +20,9 @@ export function BuscaSKU({
 
   // Execute verification search
   const performSearch = useCallback(async (term, cor, tipo) => {
-    if (!term && !cor && !tipo && selectedBrand === 'all') {
+    const isBrandFiltered = selectedBrand && selectedBrand !== 'all';
+    const trimmedTerm = (term || '').trim();
+    if (!trimmedTerm && !cor && !tipo && !isBrandFiltered) {
       setResult(null);
       setHasSearched(false);
       return;
@@ -29,12 +31,12 @@ export function BuscaSKU({
     setLoading(true);
     setHasSearched(true);
     try {
-      const brandPrefix = selectedBrand !== 'all' ? selectedBrand : '';
+      const brandPrefix = isBrandFiltered ? selectedBrand : '';
       const data = await api.verificarDisponibilidade({
-        sku: term,
+        sku: trimmedTerm,
         brand_prefix: brandPrefix,
-        cor: cor,
-        tipo: tipo,
+        cor: cor || '',
+        tipo: tipo || '',
       });
       setResult(data);
     } catch (err) {
@@ -55,8 +57,10 @@ export function BuscaSKU({
   // Debounced auto-search
   useEffect(() => {
     const handler = setTimeout(() => {
-      if (searchTerm.trim().length > 0 || selectedCor || selectedTipo || selectedBrand !== 'all') {
-        performSearch(searchTerm, selectedCor, selectedTipo);
+      const isBrandFiltered = selectedBrand && selectedBrand !== 'all';
+      const trimmedTerm = searchTerm.trim();
+      if (trimmedTerm.length > 0 || selectedCor || selectedTipo || isBrandFiltered) {
+        performSearch(trimmedTerm, selectedCor, selectedTipo);
       } else {
         setResult(null);
         setHasSearched(false);
@@ -149,6 +153,50 @@ export function BuscaSKU({
               </select>
             </div>
           </div>
+
+          {/* Active Filter Indicators & Reset Button */}
+          {(selectedCor || selectedTipo || searchTerm) && (
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="text-[11px] text-slate-400">Filtros ativos:</span>
+              {selectedCor && (
+                <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-slate-800 text-rose-300 border border-slate-700">
+                  Cor: {selectedCor}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCor('')}
+                    className="hover:text-white ml-1 text-xs font-bold leading-none"
+                    aria-label="Remover filtro de cor"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              {selectedTipo && (
+                <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-slate-800 text-indigo-300 border border-slate-700">
+                  Tipo: {selectedTipo}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTipo('')}
+                    className="hover:text-white ml-1 text-xs font-bold leading-none"
+                    aria-label="Remover filtro de tipo"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setSelectedCor('');
+                  setSelectedTipo('');
+                }}
+                className="text-[11px] text-slate-400 hover:text-white underline ml-auto"
+              >
+                Limpar todos
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
