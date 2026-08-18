@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Layers, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export function ProcessadorPreviewCard({
@@ -11,20 +11,21 @@ export function ProcessadorPreviewCard({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const items = previewData?.items || [];
+  if (!previewData) return null;
+
+  const items = previewData.items || [];
   const totalItems = items.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
 
-  // Reset page when items or pageSize change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [items.length, pageSize]);
-
-  if (!previewData) return null;
-
+  // Derive current safe page during render
   const safePage = Math.min(Math.max(1, currentPage), totalPages);
   const startIndex = (safePage - 1) * pageSize;
   const currentItems = items.slice(startIndex, startIndex + pageSize);
+
+  const handlePageSizeChange = (newSize) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
 
   return (
     <div className="space-y-5 rounded-2xl border border-slate-800 bg-dark-800/90 p-6 shadow-xl animate-fadeIn">
@@ -113,9 +114,9 @@ export function ProcessadorPreviewCard({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/80">
-            {currentItems.map((it, idx) => (
+            {currentItems.map((it) => (
               <tr
-                key={`preview-${it.sku_original}-${idx}-${it.quantidade_necessita_impressao}`}
+                key={`preview-${it.sku_original}-${it.produto_nome}-${it.quantidade_solicitada}`}
                 className="hover:bg-slate-800/30 transition-colors"
               >
                 <td className="px-4 py-2.5 font-mono font-semibold text-slate-200">
@@ -143,7 +144,7 @@ export function ProcessadorPreviewCard({
           <span>Itens por página:</span>
           <select
             value={pageSize}
-            onChange={(e) => setPageSize(Number(e.target.value))}
+            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
             aria-label="Selecionar itens por página na prévia"
             className="px-2 py-1 bg-dark-900 text-slate-200 border border-slate-700 rounded-lg text-xs font-mono focus:border-rose-500 focus:outline-none"
           >
