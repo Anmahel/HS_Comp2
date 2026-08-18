@@ -19,6 +19,8 @@ build/
 # Databases
 *.db
 *.sqlite3
+*.db-wal
+*.db-shm
 
 # Node & Frontend dependencies
 node_modules/

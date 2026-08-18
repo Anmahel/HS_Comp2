@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { FormularioEstoqueModal } from '../FormularioEstoqueModal';
 
@@ -106,7 +106,7 @@ describe('FormularioEstoqueModal Business Rules & Interaction Tests', () => {
     expect(alertBox).toHaveTextContent('A marca não pode ser alterada em um item já cadastrado');
   });
 
-  it('RULE 4: Submitting form opens pre-submit confirmation modal before calling onSave', () => {
+  it('RULE 4: Submitting form opens pre-submit confirmation modal before calling onSave', async () => {
     const handleSave = vi.fn().mockResolvedValue(true);
 
     render(
@@ -127,7 +127,12 @@ describe('FormularioEstoqueModal Business Rules & Interaction Tests', () => {
     expect(screen.getByText('Gravar no Estoque')).toBeInTheDocument();
 
     // Click final confirm
-    fireEvent.click(screen.getByTestId('final-confirm-submit-btn'));
-    expect(handleSave).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('final-confirm-submit-btn'));
+    });
+
+    await waitFor(() => {
+      expect(handleSave).toHaveBeenCalledTimes(1);
+    });
   });
 });

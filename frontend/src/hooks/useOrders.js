@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { api } from '../api';
 
-export function useOrders({ userRole = 'soporte', userName = 'Agatha', onOrderProcessed } = {}) {
+export function useOrders({ onOrderProcessed } = {}) {
   const [lotes, setLotes] = useState([]);
   const [lotesLoading, setLotesLoading] = useState(false);
 
@@ -22,7 +22,7 @@ export function useOrders({ userRole = 'soporte', userName = 'Agatha', onOrderPr
   // Process Batch of Orders
   const processarPedidosBatch = async (fileOrData) => {
     try {
-      const res = await api.procesarPedidos(fileOrData, userRole, userName);
+      const res = await api.procesarPedidos(fileOrData);
       toast.success(res.message || `Lote #${res.lote?.id} processado com sucesso!`);
       fetchLotes();
       if (onOrderProcessed) {
@@ -38,7 +38,7 @@ export function useOrders({ userRole = 'soporte', userName = 'Agatha', onOrderPr
   // Cancel Batch & Rollback Stock
   const cancelarLoteBatch = async (loteId, motivo) => {
     try {
-      const res = await api.cancelarLotePedido(loteId, motivo, userRole, userName);
+      const res = await api.cancelarLotePedido(loteId, motivo);
       toast.success(res.message || 'Lote cancelado e estoque estornado com sucesso!');
       fetchLotes();
       if (onOrderProcessed) {

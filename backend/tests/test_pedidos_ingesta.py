@@ -21,7 +21,11 @@ def app_instance():
 
 @pytest.fixture
 def client(app_instance):
-    return app_instance.test_client()
+    from tests.conftest import _auth_wrapper
+    from services.auth_service import generate_auth_token
+    with app_instance.app_context():
+        token = generate_auth_token('admin', 'Tester')
+    return _auth_wrapper(app_instance.test_client(), token)
 
 @pytest.fixture
 def session(app_instance):
@@ -282,21 +286,35 @@ def test_order_batch_cancel_and_stock_rollback(client, session):
     assert movs[0].quantidade == 3
     assert 'duplicado' in movs[0].observacao
 
-def test_rbac_roles_enforcement(client):
+def test_rbac_roles_enforcement(app, client):
+    from services.auth_service import generate_auth_token
+
+    def bearer(role):
+        with app.app_context():
+            return {'Authorization': f"Bearer {generate_auth_token(role, 'Tester')}"}
+
     # Separacion cannot process or cancel batches
     resp1 = client.post(
         '/api/pedidos/procesar',
         json={'items': [{'sku_original': 'CF-001-PRE-M', 'quantidade': 1}]},
-        headers={'X-User-Role': 'separacion'}
+        headers=bearer('separacion')
     )
     assert resp1.status_code == 403
 
     resp2 = client.post(
         '/api/pedidos/lotes/1/cancelar',
         json={'motivo': 'Tentativa sem permissao'},
-        headers={'X-User-Role': 'geral'}
+        headers=bearer('geral')
     )
     assert resp2.status_code == 403
+
+    # Valid role can access
+    resp3 = client.post(
+        '/api/pedidos/procesar',
+        json={'items': [{'sku_original': 'CF-001-PRE-M', 'quantidade': 1}]},
+        headers=bearer('soporte')
+    )
+    assert resp3.status_code == 201
 
 
 # =========================================================================

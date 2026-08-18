@@ -1,5 +1,5 @@
-import React from 'react';
-import { Layers, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Layers, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export function ProcessadorPreviewCard({
   previewData,
@@ -8,7 +8,23 @@ export function ProcessadorPreviewCard({
   onReset,
   onSubmit,
 }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
+  const items = previewData?.items || [];
+  const totalItems = items.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  // Reset page when items or pageSize change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [items.length, pageSize]);
+
   if (!previewData) return null;
+
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const currentItems = items.slice(startIndex, startIndex + pageSize);
 
   return (
     <div className="space-y-5 rounded-2xl border border-slate-800 bg-dark-800/90 p-6 shadow-xl animate-fadeIn">
@@ -84,30 +100,28 @@ export function ProcessadorPreviewCard({
         </div>
       </div>
 
-      {/* Preview Items Table */}
+      {/* Preview Items Table (Without Qtd Total Column) */}
       <div className="rounded-xl border border-slate-800 overflow-hidden">
         <table className="w-full text-left text-xs text-slate-300">
           <thead className="bg-dark-900 text-[11px] font-bold text-slate-400 uppercase font-mono border-b border-slate-800">
             <tr>
               <th className="px-4 py-2.5">SKU Original</th>
               <th className="px-4 py-2.5">Produto</th>
-              <th className="px-4 py-2.5 text-center">Qtd Total</th>
               <th className="px-4 py-2.5 text-center text-indigo-300">Peça Pronta</th>
               <th className="px-4 py-2.5 text-center text-amber-300">Estampa Avulsa</th>
               <th className="px-4 py-2.5 text-center text-rose-400">A Imprimir</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/80">
-            {previewData.items.map((it) => (
+            {currentItems.map((it, idx) => (
               <tr
-                key={`preview-${it.sku_original}-${it.quantidade_solicitada}-${it.quantidade_necessita_impressao}`}
+                key={`preview-${it.sku_original}-${idx}-${it.quantidade_necessita_impressao}`}
                 className="hover:bg-slate-800/30 transition-colors"
               >
                 <td className="px-4 py-2.5 font-mono font-semibold text-slate-200">
                   {it.sku_original}
                 </td>
                 <td className="px-4 py-2.5 text-slate-300">{it.produto_nome}</td>
-                <td className="px-4 py-2.5 text-center font-mono font-bold">{it.quantidade_solicitada}</td>
                 <td className="px-4 py-2.5 text-center font-mono text-indigo-400">
                   {it.quantidade_descontada_peca > 0 ? `${it.quantidade_descontada_peca} un` : '-'}
                 </td>
@@ -121,6 +135,52 @@ export function ProcessadorPreviewCard({
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Pagination Bar (10, 20, 30 items) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 text-xs text-slate-400">
+        <div className="flex items-center gap-2">
+          <span>Itens por página:</span>
+          <select
+            value={pageSize}
+            onChange={(e) => setPageSize(Number(e.target.value))}
+            aria-label="Selecionar itens por página na prévia"
+            className="px-2 py-1 bg-dark-900 text-slate-200 border border-slate-700 rounded-lg text-xs font-mono focus:border-rose-500 focus:outline-none"
+          >
+            <option value={10}>10 por página</option>
+            <option value={20}>20 por página</option>
+            <option value={30}>30 por página</option>
+          </select>
+          <span className="text-slate-500 ml-2">
+            Mostrando {totalItems > 0 ? startIndex + 1 : 0} a {Math.min(startIndex + pageSize, totalItems)} de {totalItems} itens
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5 self-end sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={safePage <= 1}
+            aria-label="Página anterior"
+            className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+
+          <span className="px-3 py-1 bg-dark-900 rounded-lg border border-slate-800 font-mono text-slate-300">
+            Página <span className="font-bold text-white">{safePage}</span> de <span className="font-bold text-white">{totalPages}</span>
+          </span>
+
+          <button
+            type="button"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={safePage >= totalPages}
+            aria-label="Próxima página"
+            className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );

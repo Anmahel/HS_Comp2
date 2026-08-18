@@ -134,30 +134,32 @@ export function HistoricoLotesTable({
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1.5">
                           {/* PDF 1: Imprenta */}
-                          <a
-                            href={api.getPdfImprentaUrl(lote.id)}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            type="button"
+                            onClick={() => {
+                              api.downloadPdf(`/pedidos/lotes/${lote.id}/pdf-imprenta`, `lote_${lote.id}_imprenta.pdf`).catch(() => {});
+                            }}
                             title="Baixar PDF 1 (Imprenta / Produção)"
                             aria-label={`Baixar PDF 1 de Imprenta para lote ${lote.id}`}
                             className="p-1.5 rounded-lg bg-rose-500/15 text-rose-300 hover:bg-rose-500 hover:text-white border border-rose-500/30 transition-colors flex items-center gap-1 text-[11px] font-semibold"
                           >
                             <Printer className="h-3.5 w-3.5" />
                             <span>PDF 1</span>
-                          </a>
+                          </button>
 
                           {/* PDF 2: Separação */}
-                          <a
-                            href={api.getPdfSeparacaoUrl(lote.id)}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            type="button"
+                            onClick={() => {
+                              api.downloadPdf(`/pedidos/lotes/${lote.id}/pdf-separacao`, `lote_${lote.id}_separacao.pdf`).catch(() => {});
+                            }}
                             title="Baixar PDF 2 (Separação / Almoxarifado)"
                             aria-label={`Baixar PDF 2 de Separação para lote ${lote.id}`}
                             className="p-1.5 rounded-lg bg-indigo-500/15 text-indigo-300 hover:bg-indigo-500 hover:text-white border border-indigo-500/30 transition-colors flex items-center gap-1 text-[11px] font-semibold"
                           >
                             <PackageCheck className="h-3.5 w-3.5" />
                             <span>PDF 2</span>
-                          </a>
+                          </button>
 
                           {/* Cancel button if active */}
                           {!isCanceled && canCancel && (

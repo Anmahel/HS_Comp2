@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { History, ArrowDownRight, ArrowUpRight, RefreshCw, Filter } from 'lucide-react';
+import { History, ArrowDownRight, ArrowUpRight, RefreshCw } from 'lucide-react';
 import { formatDateTime, getMovimentoBadge } from '../utils/formatters';
 
 const EMPTY_MOVIMENTACOES = [];

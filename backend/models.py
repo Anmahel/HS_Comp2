@@ -302,6 +302,27 @@ class LotePedido(Base):
             res['itens'] = [item.to_dict() for item in self.itens]
         return res
 
+class User(Base):
+    __tablename__ = 'users'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(50), nullable=False, unique=True, index=True)
+    password_hash = Column(String(255), nullable=False)
+    name = Column(String(100), nullable=False, default='Operador')
+    role = Column(String(20), nullable=False, default='geral')
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'username': self.username,
+            'name': self.name,
+            'role': self.role,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
 class ItemPedido(Base):
     __tablename__ = 'itens_pedidos'
 

@@ -1,6 +1,11 @@
 import threading
 import pytest
 from models import PecaPronta, MovimentacaoEstoque
+from services.auth_service import generate_auth_token
+
+def _auth_headers(app):
+    with app.app_context():
+        return {'Authorization': f"Bearer {generate_auth_token('soporte', 'Tester')}"}
 
 def test_concurrent_stock_deduction(app, client):
     with app.app_context():
@@ -14,6 +19,7 @@ def test_concurrent_stock_deduction(app, client):
         num_threads = 5
         deduct_per_thread = 2
         results = []
+        headers = _auth_headers(app)
 
         def worker():
             with app.test_client() as c:
@@ -21,7 +27,7 @@ def test_concurrent_stock_deduction(app, client):
                     'categoria': 'peca',
                     'id': item_id,
                     'quantidade': deduct_per_thread
-                })
+                }, headers=headers)
                 results.append(res.status_code)
 
         threads = [threading.Thread(target=worker) for _ in range(num_threads)]
@@ -50,6 +56,7 @@ def test_concurrent_overdraft_prevention(app):
         # 3 threads each requesting 2 units (Total 6 units requested, only 4 available)
         num_threads = 3
         results = []
+        headers = _auth_headers(app)
 
         def worker():
             with app.test_client() as c:
@@ -57,7 +64,7 @@ def test_concurrent_overdraft_prevention(app):
                     'categoria': 'peca',
                     'id': item_id,
                     'quantidade': 2
-                })
+                }, headers=headers)
                 results.append(res.status_code)
 
         threads = [threading.Thread(target=worker) for _ in range(num_threads)]

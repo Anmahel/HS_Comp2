@@ -1,10 +1,26 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { api } from '../api';
+import { api, setAuthToken, clearAuthToken, getAuthToken } from '../api';
 import { useCatalogs } from './useCatalogs';
 import { useInventory } from './useInventory';
 import { useOrders } from './useOrders';
 import { useModals } from './useModals';
+
+const USER_STORAGE_KEY = 'hc_auth_user_v1';
+
+const userStorage = () =>
+  typeof window !== 'undefined' && window.sessionStorage ? window.sessionStorage : null;
+
+function loadStoredUser() {
+  const s = userStorage();
+  if (!s) return null;
+  try {
+    const raw = s.getItem(USER_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 export function useEstoque() {
   // Theme state
@@ -12,14 +28,8 @@ export function useEstoque() {
     return localStorage.getItem('hc_theme') || 'dark';
   });
 
-  // Role-Based Access Control (RBAC) User state
-  const [userRole, setUserRoleState] = useState(() => {
-    return localStorage.getItem('hc_user_role') || 'soporte';
-  });
-
-  const [userName, setUserName] = useState(() => {
-    return localStorage.getItem('hc_user_name') || 'Agatha';
-  });
+  // Authenticated session state (aligned with in-memory token security)
+  const [user, setUser] = useState(() => (getAuthToken() ? loadStoredUser() : null));
 
   // Navigation tab state
   const [activeTab, setActiveTab] = useState(() => {
@@ -96,8 +106,6 @@ export function useEstoque() {
     processarPedidosBatch,
     cancelarLoteBatch: baseCancelarLoteBatch,
   } = useOrders({
-    userRole,
-    userName,
     onOrderProcessed: handleDataMutation,
   });
 
@@ -113,7 +121,7 @@ export function useEstoque() {
     localStorage.setItem('hc_theme', theme);
   }, [theme]);
 
-  // Persist tab, brand, and role
+  // Persist tab and brand
   useEffect(() => {
     localStorage.setItem('hc_active_tab', activeTab);
   }, [activeTab]);
@@ -122,33 +130,43 @@ export function useEstoque() {
     localStorage.setItem('hc_selected_brand', selectedBrand);
   }, [selectedBrand]);
 
+  // Force logout when the backend rejects the session
   useEffect(() => {
-    localStorage.setItem('hc_user_role', userRole);
-  }, [userRole]);
-
-  useEffect(() => {
-    localStorage.setItem('hc_user_name', userName);
-  }, [userName]);
+    const handleUnauthorized = () => {
+      setUser(null);
+      clearAuthToken();
+      userStorage()?.removeItem(USER_STORAGE_KEY);
+      toast.error('Sessão expirada. Faça login novamente.');
+    };
+    window.addEventListener('hc:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('hc:unauthorized', handleUnauthorized);
+  }, []);
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  const setUserRole = (role, name = null) => {
-    setUserRoleState(role);
-    if (name) {
-      setUserName(name);
-    } else {
-      const defaultNames = {
-        soporte: 'Agatha',
-        separacion: 'Equipe Separação',
-        geral: 'Colaborador',
-        jefe: 'Diretoria / Gestão',
-        admin: 'Engenharia / Admin',
-      };
-      setUserName(defaultNames[role] || 'Usuário');
+  const login = useCallback(async (username, password) => {
+    const data = await api.login(username, password);
+    setAuthToken(data.token);
+    setUser(data.user);
+    userStorage()?.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+    return data.user;
+  }, []);
+
+  const logout = useCallback(() => {
+    clearAuthToken();
+    userStorage()?.removeItem(USER_STORAGE_KEY);
+    setUser(null);
+  }, []);
+
+  // Restore session on load if a token exists but no user object
+  useEffect(() => {
+    if (getAuthToken() && !user) {
+      clearAuthToken();
+      userStorage()?.removeItem(USER_STORAGE_KEY);
     }
-  };
+  }, [user]);
 
   // Refresh current view data
   const refreshCurrentView = useCallback(() => {
@@ -158,20 +176,25 @@ export function useEstoque() {
       fetchPecas();
       fetchEstampas();
     }
+    if (activeTab === 'historico_lotes') fetchLotes();
     if (activeTab === 'pecas') fetchPecas();
     if (activeTab === 'estampas') fetchEstampas();
     if (activeTab === 'dashboard') fetchDashboardStats();
     if (activeTab === 'movimentacoes') fetchMovimentacoes();
   }, [activeTab, fetchCatalogs, fetchLotes, fetchPecas, fetchEstampas, fetchDashboardStats, fetchMovimentacoes]);
 
-  // Initial load
+  // Initial load only when user is authenticated
   useEffect(() => {
-    fetchCatalogs();
-  }, [fetchCatalogs]);
+    if (user) {
+      fetchCatalogs();
+    }
+  }, [user, fetchCatalogs]);
 
   useEffect(() => {
-    refreshCurrentView();
-  }, [activeTab, selectedBrand, refreshCurrentView]);
+    if (user) {
+      refreshCurrentView();
+    }
+  }, [user, activeTab, selectedBrand, refreshCurrentView]);
 
   // Wrapped saveInventoryItem with modal integration
   const saveInventoryItem = async (formData) => {
@@ -202,9 +225,12 @@ export function useEstoque() {
   return {
     theme,
     toggleTheme,
-    userRole,
-    userName,
-    setUserRole,
+    user,
+    isAuthenticated: Boolean(user),
+    userRole: user ? user.role : null,
+    userName: user ? user.name : null,
+    login,
+    logout,
     activeTab,
     setActiveTab,
     selectedBrand,

@@ -3,6 +3,15 @@ import { CheckCircle2, Printer, PackageCheck, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../api';
 
+async function downloadPdf(endpoint, filename) {
+  try {
+    await api.downloadPdf(endpoint, filename);
+    toast.success(`PDF "${filename}" baixado com sucesso!`);
+  } catch (e) {
+    toast.error(e.message || 'Erro ao baixar PDF');
+  }
+}
+
 export function ProcessadorSuccessCard({
   lote,
   onReset,
@@ -64,25 +73,23 @@ export function ProcessadorSuccessCard({
 
       {/* Action Downloads & WhatsApp */}
       <div className="flex flex-wrap items-center gap-3 pt-2">
-        <a
-          href={api.getPdfImprentaUrl(lote.id)}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          onClick={() => downloadPdf(`/pedidos/lotes/${lote.id}/pdf-imprenta`, `lote_${lote.id}_imprenta.pdf`)}
           className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition-colors flex items-center gap-2"
         >
           <Printer className="h-4 w-4" />
           Baixar PDF 1 (Imprenta / Produção)
-        </a>
+        </button>
 
-        <a
-          href={api.getPdfSeparacaoUrl(lote.id)}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          onClick={() => downloadPdf(`/pedidos/lotes/${lote.id}/pdf-separacao`, `lote_${lote.id}_separacao.pdf`)}
           className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-colors flex items-center gap-2"
         >
           <PackageCheck className="h-4 w-4" />
           Baixar PDF 2 (Separação / Almoxarifado)
-        </a>
+        </button>
 
         <button
           type="button"

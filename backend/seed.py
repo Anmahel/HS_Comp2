@@ -1,5 +1,39 @@
+import os
 from database import db_session, Base
-from models import Brand, Cor, Design, SKU, Tamanho, Tipo, PecaPronta, Estampa, MovimentacaoEstoque
+from models import Brand, Cor, Design, SKU, Tamanho, Tipo, PecaPronta, Estampa, MovimentacaoEstoque, User
+from services.auth_service import hash_password
+
+def seed_default_user(session):
+    """
+    Creates the default administrator user if no users exist.
+    Credentials come from ADMIN_USERNAME / ADMIN_PASSWORD env vars.
+    In non-production environments a documented default is used when the env var is missing.
+    """
+    if session.query(User).first():
+        return
+
+    env = os.environ.get('FLASK_ENV', 'development').lower()
+    username = os.environ.get('ADMIN_USERNAME', 'admin').strip()
+    password = os.environ.get('ADMIN_PASSWORD')
+    name = os.environ.get('ADMIN_NAME', 'Administrador').strip()
+
+    if not password:
+        if env == 'production':
+            raise RuntimeError(
+                'ADMIN_PASSWORD é obrigatório em produção para criar o usuário administrador inicial.'
+            )
+        password = 'admin123'
+
+    user = User(
+        username=username,
+        password_hash=hash_password(password),
+        name=name,
+        role='admin',
+        is_active=True
+    )
+    session.add(user)
+    session.flush()
+    print(f"Default admin user '{username}' created.")
 
 def seed_database(session=None):
     if session is None:
@@ -194,6 +228,9 @@ def seed_database(session=None):
                 observacao='Carga inicial de estampas'
             )
             session.add(mov)
+
+    # Seed default administrator user
+    seed_default_user(session)
 
     session.commit()
     print("Database successfully seeded.")

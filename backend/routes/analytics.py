@@ -1,6 +1,7 @@
 from flask import request, jsonify, current_app
 from sqlalchemy import func
 from models import Brand, Design, PecaPronta, Estampa, MovimentacaoEstoque
+from services.auth_service import require_any_auth
 from . import analytics_bp
 
 def get_session():
@@ -10,6 +11,7 @@ def get_session():
 # MOVIMENTAÇÕES DE ESTOQUE (/api/movimentacoes)
 # ---------------------------------------------------------
 @analytics_bp.route('/api/movimentacoes', methods=['GET'])
+@require_any_auth
 def get_movimentacoes():
     session = get_session()
     query = session.query(MovimentacaoEstoque).order_by(MovimentacaoEstoque.data_hora.desc())
@@ -22,7 +24,8 @@ def get_movimentacoes():
     if tipo_movimento:
         query = query.filter(MovimentacaoEstoque.tipo_movimento == tipo_movimento)
 
-    limit = request.args.get('limit', 100, type=int)
+    raw_limit = request.args.get('limit', 100, type=int)
+    limit = min(max(1, raw_limit if raw_limit is not None else 100), 500)
     movs = query.limit(limit).all()
     return jsonify([m.to_dict() for m in movs])
 
@@ -31,6 +34,7 @@ def get_movimentacoes():
 # DASHBOARD STATS (/api/dashboard/stats)
 # ---------------------------------------------------------
 @analytics_bp.route('/api/dashboard/stats', methods=['GET'])
+@require_any_auth
 def get_dashboard_stats():
     session = get_session()
 

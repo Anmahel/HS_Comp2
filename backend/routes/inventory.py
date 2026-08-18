@@ -2,8 +2,11 @@ import threading
 import re
 from flask import request, jsonify, current_app
 from sqlalchemy import or_
+from sqlalchemy.orm import joinedload
 from models import Brand, Cor, Design, SKU, Tamanho, Tipo, PecaPronta, Estampa, MovimentacaoEstoque
 from services.catalog_service import resolve_design, get_or_create_sku
+from services.sanitize import escape_like
+from services.auth_service import check_auth_roles, require_any_auth, INVENTORY_WRITE_ROLES
 from . import inventory_bp
 
 stock_lock = threading.Lock()
@@ -11,14 +14,31 @@ stock_lock = threading.Lock()
 def get_session():
     return current_app.db_session
 
+def require_write():
+    if request.method == 'GET':
+        return None
+    return check_auth_roles(INVENTORY_WRITE_ROLES)
+
 # ---------------------------------------------------------
 # PEÇAS PRONTAS (/api/pecas-prontas)
 # ---------------------------------------------------------
 @inventory_bp.route('/api/pecas-prontas', methods=['GET', 'POST'])
+@require_any_auth
 def handle_pecas_prontas():
     session = get_session()
+    denied = require_write()
+    if denied:
+        return denied
+
     if request.method == 'GET':
-        query = session.query(PecaPronta)
+        query = session.query(PecaPronta).options(
+            joinedload(PecaPronta.design),
+            joinedload(PecaPronta.cor),
+            joinedload(PecaPronta.tipo),
+            joinedload(PecaPronta.tamanho),
+            joinedload(PecaPronta.brand),
+            joinedload(PecaPronta.sku)
+        )
 
         include_zero = request.args.get('include_zero', 'false').lower() in ['true', '1', 'yes']
         if not include_zero:
@@ -46,32 +66,36 @@ def handle_pecas_prontas():
 
         q = request.args.get('q', '').strip()
         if q:
+            escaped_q = escape_like(q)
             query = query.join(PecaPronta.design).join(PecaPronta.brand).join(PecaPronta.cor).join(PecaPronta.tamanho).join(PecaPronta.tipo)
             query = query.filter(
                 or_(
-                    Design.nome_design.ilike(f"%{q}%"),
-                    Design.codigo_estampa.ilike(f"%{q}%"),
-                    Brand.name.ilike(f"%{q}%"),
-                    Brand.slug.ilike(f"%{q}%"),
-                    Cor.cor.ilike(f"%{q}%"),
-                    Cor.nome.ilike(f"%{q}%"),
-                    Tamanho.tamanho.ilike(f"%{q}%"),
-                    Tipo.codigo.ilike(f"%{q}%")
+                    Design.nome_design.ilike(f"%{escaped_q}%"),
+                    Design.codigo_estampa.ilike(f"%{escaped_q}%"),
+                    Brand.name.ilike(f"%{escaped_q}%"),
+                    Brand.slug.ilike(f"%{escaped_q}%"),
+                    Cor.cor.ilike(f"%{escaped_q}%"),
+                    Cor.nome.ilike(f"%{escaped_q}%"),
+                    Tamanho.tamanho.ilike(f"%{escaped_q}%"),
+                    Tipo.codigo.ilike(f"%{escaped_q}%")
                 )
             )
 
-        page = request.args.get('page', type=int)
-        per_page = request.args.get('per_page', 50, type=int)
+        raw_page = request.args.get('page', type=int)
+        raw_per_page = request.args.get('per_page', 50, type=int)
 
-        if page:
+        if raw_page is not None:
+            page = max(1, raw_page)
+            per_page = min(max(1, raw_per_page if raw_per_page is not None else 50), 500)
             total = query.count()
+            pages = (total + per_page - 1) // per_page if per_page > 0 else 1
             items = query.offset((page - 1) * per_page).limit(per_page).all()
             return jsonify({
                 'items': [item.to_dict() for item in items],
                 'total': total,
                 'page': page,
                 'per_page': per_page,
-                'pages': (total + per_page - 1) // per_page
+                'pages': pages
             })
 
         items = query.all()
@@ -96,7 +120,7 @@ def handle_pecas_prontas():
             qtd = int(qtd)
             if qtd < 0:
                 return jsonify({'error': 'A quantidade inicial não pode ser negativa'}), 400
-        except ValueError:
+        except (ValueError, TypeError):
             return jsonify({'error': 'Quantidade inválida'}), 400
 
         brand = session.get(Brand, brand_id)
@@ -183,8 +207,13 @@ def handle_pecas_prontas():
 
 
 @inventory_bp.route('/api/pecas-prontas/<int:item_id>', methods=['GET', 'PUT', 'DELETE'])
+@require_any_auth
 def handle_peca_pronta_detail(item_id):
     session = get_session()
+    denied = require_write()
+    if denied:
+        return denied
+
     item = session.get(PecaPronta, item_id)
     if not item:
         return jsonify({'error': 'Peça pronta não encontrada'}), 404
@@ -257,19 +286,30 @@ def handle_peca_pronta_detail(item_id):
             session.add(mov)
             session.commit()
             return jsonify({'message': 'Peça pronta excluída com sucesso'})
-        except Exception as e:
+        except Exception:
             session.rollback()
-            return jsonify({'error': str(e)}), 400
+            current_app.logger.exception('Erro ao excluir peça pronta')
+            return jsonify({'error': 'Erro interno ao excluir peça pronta'}), 400
 
 
 # ---------------------------------------------------------
 # ESTAMPAS AVULSAS (/api/estampas)
 # ---------------------------------------------------------
 @inventory_bp.route('/api/estampas', methods=['GET', 'POST'])
+@require_any_auth
 def handle_estampas():
     session = get_session()
+    denied = require_write()
+    if denied:
+        return denied
+
     if request.method == 'GET':
-        query = session.query(Estampa)
+        query = session.query(Estampa).options(
+            joinedload(Estampa.design),
+            joinedload(Estampa.cor),
+            joinedload(Estampa.brand),
+            joinedload(Estampa.sku)
+        )
 
         include_zero = request.args.get('include_zero', 'false').lower() in ['true', '1', 'yes']
         if not include_zero:
@@ -289,30 +329,34 @@ def handle_estampas():
 
         q = request.args.get('q', '').strip()
         if q:
+            escaped_q = escape_like(q)
             query = query.join(Estampa.design).join(Estampa.brand).join(Estampa.cor)
             query = query.filter(
                 or_(
-                    Design.nome_design.ilike(f"%{q}%"),
-                    Design.codigo_estampa.ilike(f"%{q}%"),
-                    Brand.name.ilike(f"%{q}%"),
-                    Brand.slug.ilike(f"%{q}%"),
-                    Cor.cor.ilike(f"%{q}%"),
-                    Cor.nome.ilike(f"%{q}%")
+                    Design.nome_design.ilike(f"%{escaped_q}%"),
+                    Design.codigo_estampa.ilike(f"%{escaped_q}%"),
+                    Brand.name.ilike(f"%{escaped_q}%"),
+                    Brand.slug.ilike(f"%{escaped_q}%"),
+                    Cor.cor.ilike(f"%{escaped_q}%"),
+                    Cor.nome.ilike(f"%{escaped_q}%")
                 )
             )
 
-        page = request.args.get('page', type=int)
-        per_page = request.args.get('per_page', 50, type=int)
+        raw_page = request.args.get('page', type=int)
+        raw_per_page = request.args.get('per_page', 50, type=int)
 
-        if page:
+        if raw_page is not None:
+            page = max(1, raw_page)
+            per_page = min(max(1, raw_per_page if raw_per_page is not None else 50), 200)
             total = query.count()
+            pages = (total + per_page - 1) // per_page if per_page > 0 else 1
             items = query.offset((page - 1) * per_page).limit(per_page).all()
             return jsonify({
                 'items': [item.to_dict() for item in items],
                 'total': total,
                 'page': page,
                 'per_page': per_page,
-                'pages': (total + per_page - 1) // per_page
+                'pages': pages
             })
 
         items = query.all()
@@ -419,8 +463,13 @@ def handle_estampas():
 
 
 @inventory_bp.route('/api/estampas/<int:item_id>', methods=['GET', 'PUT', 'DELETE'])
+@require_any_auth
 def handle_estampa_detail(item_id):
     session = get_session()
+    denied = require_write()
+    if denied:
+        return denied
+
     item = session.get(Estampa, item_id)
     if not item:
         return jsonify({'error': 'Estampa não encontrada'}), 404
@@ -488,17 +537,23 @@ def handle_estampa_detail(item_id):
             session.add(mov)
             session.commit()
             return jsonify({'message': 'Estampa excluída com sucesso'})
-        except Exception as e:
+        except Exception:
             session.rollback()
-            return jsonify({'error': str(e)}), 400
+            current_app.logger.exception('Erro ao excluir estampa')
+            return jsonify({'error': 'Erro interno ao excluir estampa'}), 400
 
 
 # ---------------------------------------------------------
 # ATOMIC STOCK DEDUCTION (/api/usar-estoque)
 # ---------------------------------------------------------
 @inventory_bp.route('/api/usar-estoque', methods=['POST'])
+@require_any_auth
 def handle_usar_estoque():
     session = get_session()
+    denied = check_auth_roles(INVENTORY_WRITE_ROLES)
+    if denied:
+        return denied
+
     data = request.get_json() or {}
     categoria = data.get('categoria')  # 'peca' or 'estampa'
     item_id = data.get('id')
@@ -556,15 +611,17 @@ def handle_usar_estoque():
                 'movimentacao': mov.to_dict()
             }), 200
 
-        except Exception as e:
+        except Exception:
             session.rollback()
-            return jsonify({'error': f"Erro ao processar baixa de estoque: {str(e)}"}), 500
+            current_app.logger.exception('Erro ao processar baixa de estoque')
+            return jsonify({'error': 'Erro interno ao processar baixa de estoque'}), 500
 
 
 # ---------------------------------------------------------
 # AVAILABILITY VERIFIER (/api/verificar-disponibilidade)
 # ---------------------------------------------------------
 @inventory_bp.route('/api/verificar-disponibilidade', methods=['GET'])
+@require_any_auth
 def verificar_disponibilidade():
     session = get_session()
     raw_query = request.args.get('sku', '').strip()
@@ -615,15 +672,16 @@ def verificar_disponibilidade():
             extracted_code = code_match.group(1)
 
     # Query Peças Prontas
+    escaped_raw = escape_like(raw_query)
     pecas_query = session.query(PecaPronta).filter(PecaPronta.quantidade > 0)
     if extracted_code:
         pecas_query = pecas_query.join(PecaPronta.design).filter(Design.codigo_estampa == extracted_code)
     elif raw_query:
         pecas_query = pecas_query.join(PecaPronta.design).outerjoin(PecaPronta.sku).filter(
             or_(
-                Design.nome_design.ilike(f"%{raw_query}%"),
-                Design.codigo_estampa.ilike(f"%{raw_query}%"),
-                SKU.sku.ilike(f"%{raw_query}%")
+                Design.nome_design.ilike(f"%{escaped_raw}%"),
+                Design.codigo_estampa.ilike(f"%{escaped_raw}%"),
+                SKU.sku.ilike(f"%{escaped_raw}%")
             )
         )
 
@@ -646,9 +704,9 @@ def verificar_disponibilidade():
     elif raw_query:
         estampas_query = estampas_query.join(Estampa.design).outerjoin(Estampa.sku).filter(
             or_(
-                Design.nome_design.ilike(f"%{raw_query}%"),
-                Design.codigo_estampa.ilike(f"%{raw_query}%"),
-                SKU.sku.ilike(f"%{raw_query}%")
+                Design.nome_design.ilike(f"%{escaped_raw}%"),
+                Design.codigo_estampa.ilike(f"%{escaped_raw}%"),
+                SKU.sku.ilike(f"%{escaped_raw}%")
             )
         )
 

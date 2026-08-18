@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, LayoutDashboard, Shirt, Palette, History, FileSpreadsheet } from 'lucide-react';
+import { Search, LayoutDashboard, Shirt, Palette, History, FileSpreadsheet, Clock } from 'lucide-react';
 
 export function NavigationTabs({ activeTab, onSelectTab, counts = {} }) {
   const tabs = [
@@ -7,8 +7,15 @@ export function NavigationTabs({ activeTab, onSelectTab, counts = {} }) {
       id: 'pedidos',
       label: 'Processar Pedidos & PDFs',
       icon: FileSpreadsheet,
-      badge: counts.lotes !== undefined && counts.lotes > 0 ? `${counts.lotes} lote(s)` : null,
+      badge: null,
       highlight: true,
+    },
+    {
+      id: 'historico_lotes',
+      label: 'Histórico de Lotes',
+      icon: Clock,
+      badge: counts.lotes !== undefined && counts.lotes > 0 ? `${counts.lotes} lote(s)` : null,
+      highlight: false,
     },
     {
       id: 'verificador',

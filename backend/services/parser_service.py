@@ -291,32 +291,37 @@ def parse_pdf_content(file_bytes):
                     if 'Separação de mercadorias' in row_text or ('Produto' in row_text and 'Cód' in row_text):
                         continue
 
+                    sku_cell_idx = -1
                     sku_val = None
-                    for cell in row:
+                    for idx, cell in enumerate(row):
                         if cell:
                             m_sku = sku_regex.search(str(cell).strip())
                             if m_sku:
                                 sku_val = m_sku.group(1).upper()
+                                sku_cell_idx = idx
                                 break
 
-                    if not sku_val:
+                    if not sku_val or sku_cell_idx == -1:
                         continue
 
-                    # Search for decimal quantity cell with 'Pç'
+                    # Search for quantity strictly in cells following the SKU cell
                     qtd_val = 1
-                    for cell in row:
+                    for idx in range(sku_cell_idx + 1, len(row)):
+                        cell = row[idx]
                         if cell:
                             cell_str = str(cell).strip()
                             m_qtd = qtd_pc_regex.search(cell_str)
                             if m_qtd:
                                 qtd_val = parse_quantity_value(m_qtd.group(1))
                                 break
-                            elif 'Pç' in cell_str or re.match(r'^\d+(?:[\.,]\d+)?$', cell_str):
+                            elif re.match(r'^\d+(?:[\.,]\d+)?(?:\s*Pç|\s*un)?$', cell_str, re.IGNORECASE):
                                 qtd_val = parse_quantity_value(cell_str)
+                                break
 
-                    # Extract product name
+                    # Extract product name from cells preceding the SKU cell
                     prod_val = None
-                    for cell in row:
+                    for idx in range(0, sku_cell_idx):
+                        cell = row[idx]
                         if cell:
                             c_str = str(cell).strip()
                             if c_str and sku_val not in c_str and 'Pç' not in c_str and not re.match(r'^\d+(?:[\.,]\d+)?$', c_str):
@@ -349,15 +354,21 @@ def parse_pdf_content(file_bytes):
                     m_sku = sku_regex.search(line)
                     if m_sku:
                         sku_val = m_sku.group(1).upper()
+                        sku_end = m_sku.end()
 
-                        # Capture quantity looking for decimal + Pç: r'(\d+[\.,]\d+)\s*Pç'
-                        m_qtd = qtd_pc_regex.search(line)
+                        # The quantity is strictly located AFTER the SKU on the line
+                        after_sku_text = line[sku_end:].strip()
+
+                        m_qtd = qtd_pc_regex.search(after_sku_text)
                         if m_qtd:
                             qtd_val = parse_quantity_value(m_qtd.group(1))
                         else:
-                            # Fallback generic decimal
-                            m_gen = re.search(r'(\d+(?:[\.,]\d+)?)\s*(?:Pç|un)?', line, re.IGNORECASE)
-                            qtd_val = parse_quantity_value(m_gen.group(1) if m_gen else 1)
+                            # Search in text after the SKU (never before, to avoid SKU design codes)
+                            m_after = re.search(r'(\d+(?:[\.,]\d+)?)\s*(?:Pç|pc|pçs|un|peca|peça)?', after_sku_text, re.IGNORECASE)
+                            if m_after:
+                                qtd_val = parse_quantity_value(m_after.group(1))
+                            else:
+                                qtd_val = 1
 
                         # Extract product title (text preceding the SKU)
                         sku_pos = line.find(m_sku.group(0))

@@ -1,5 +1,20 @@
 const API_BASE = '/api';
 
+// In-memory token storage (XSS-safe, compliant with React Doctor security recommendations)
+let inMemoryAuthToken = null;
+
+export function setAuthToken(token) {
+  inMemoryAuthToken = token ? String(token).trim() : null;
+}
+
+export function getAuthToken() {
+  return inMemoryAuthToken;
+}
+
+export function clearAuthToken() {
+  inMemoryAuthToken = null;
+}
+
 async function request(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
   const isFormData = options.body instanceof FormData;
@@ -8,6 +23,11 @@ async function request(endpoint, options = {}) {
     ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
     ...options.headers,
   };
+
+  const token = getAuthToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
   const config = {
     ...options,
@@ -20,6 +40,11 @@ async function request(endpoint, options = {}) {
 
   const response = await fetch(url, config);
 
+  if (response.status === 401) {
+    clearAuthToken();
+    window.dispatchEvent(new CustomEvent('hc:unauthorized'));
+  }
+
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
     const errorMsg = errorData && errorData.error ? errorData.error : `Erro HTTP ${response.status}`;
@@ -31,6 +56,9 @@ async function request(endpoint, options = {}) {
 }
 
 export const api = {
+  // Auth
+  login: (username, password) => request('/auth/login', { method: 'POST', body: { username, password } }),
+
   // Catalogs
   getBrands: () => request('/brands'),
   getCores: () => request('/cores'),
@@ -81,7 +109,7 @@ export const api = {
     return request(`/verificar-disponibilidade?${query.toString()}`);
   },
 
-  // Order Processing & Ingestion (RBAC)
+  // Order Processing & Ingestion (RBAC via authenticated token)
   previaPedidos: (body) => {
     return request('/pedidos/previa', {
       method: 'POST',
@@ -89,14 +117,10 @@ export const api = {
     });
   },
 
-  procesarPedidos: (body, role = 'soporte', userName = 'Agatha') => {
+  procesarPedidos: (body) => {
     return request('/pedidos/procesar', {
       method: 'POST',
       body,
-      headers: {
-        'X-User-Role': role,
-        'X-User-Name': userName,
-      },
     });
   },
 
@@ -107,14 +131,10 @@ export const api = {
 
   getLoteDetalhe: (id) => request(`/pedidos/lotes/${id}`),
 
-  cancelarLotePedido: (id, motivo, role = 'soporte', userName = 'Agatha') => {
+  cancelarLotePedido: (id, motivo) => {
     return request(`/pedidos/lotes/${id}/cancelar`, {
       method: 'POST',
       body: { motivo },
-      headers: {
-        'X-User-Role': role,
-        'X-User-Name': userName,
-      },
     });
   },
 
@@ -125,6 +145,31 @@ export const api = {
 
   getPdfImprentaUrl: (loteId) => `${API_BASE}/pedidos/lotes/${loteId}/pdf-imprenta`,
   getPdfSeparacaoUrl: (loteId) => `${API_BASE}/pedidos/lotes/${loteId}/pdf-separacao`,
+
+  downloadPdf: async (endpoint, filename) => {
+    const token = getAuthToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch(`${API_BASE}${endpoint}`, { headers });
+
+    if (response.status === 401) {
+      clearAuthToken();
+      window.dispatchEvent(new CustomEvent('hc:unauthorized'));
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+    if (!response.ok) throw new Error(`Erro HTTP ${response.status}`);
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 
   // Analytics & Audit Trail
   getMovimentacoes: (params = {}) => {

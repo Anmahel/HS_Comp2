@@ -1,14 +1,15 @@
 import React from 'react';
-import { Plus, Sun, Moon, ShieldCheck, User } from 'lucide-react';
+import { Plus, Sun, Moon, ShieldCheck, User, LogOut, LogIn } from 'lucide-react';
 import crLogo from '../Static/img/CR1_clean.png';
 
-const ROLES = [
-  { id: 'soporte', label: 'Soporte (Agatha)', iconColor: 'text-rose-400' },
-  { id: 'separacion', label: 'Separação', iconColor: 'text-indigo-400' },
-  { id: 'geral', label: 'Geral', iconColor: 'text-emerald-400' },
-  { id: 'jefe', label: 'Jefe / Diretoria', iconColor: 'text-amber-400' },
-  { id: 'admin', label: 'Admin / Eng', iconColor: 'text-purple-400' },
-];
+const ROLE_LABELS = {
+  soporte: 'Soporte',
+  separacion: 'Separação',
+  geral: 'Geral',
+  jefe: 'Jefe / Diretoria',
+  admin: 'Admin / Eng',
+  ing: 'Ing',
+};
 
 export function Header({
   brands = [],
@@ -17,8 +18,9 @@ export function Header({
   theme,
   onToggleTheme,
   onOpenCreate,
-  userRole = 'soporte',
-  onSelectRole,
+  user = null,
+  onOpenLogin,
+  onLogout,
 }) {
   return (
     <header className="border-b border-slate-800 bg-dark-900/80 backdrop-blur-md sticky top-0 z-30 transition-colors">
@@ -84,27 +86,42 @@ export function Header({
           })}
         </div>
 
-        {/* Action Controls & Role Switcher */}
+        {/* Action Controls & Session */}
         <div className="flex items-center gap-2.5 self-end md:self-auto">
-          {/* RBAC Role Selector */}
-          <div className="flex items-center gap-1.5 bg-dark-800 px-2.5 py-1 rounded-xl border border-slate-700/60 text-xs">
-            <User className="h-3.5 w-3.5 text-rose-400" />
-            <label htmlFor="role-select" className="sr-only">Selecionar Perfil RBAC</label>
-            <select
-              id="role-select"
-              data-testid="select-user-role"
-              aria-label="Selecionar Perfil RBAC"
-              value={userRole}
-              onChange={(e) => onSelectRole && onSelectRole(e.target.value)}
-              className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer"
+          {/* Session: login / user badge */}
+          {user ? (
+            <div
+              data-testid="user-session-badge"
+              className="flex items-center gap-1.5 bg-dark-800 px-2.5 py-1 rounded-xl border border-slate-700/60 text-xs"
+              title={`${user.name} (${user.role})`}
             >
-              {ROLES.map((r) => (
-                <option key={r.id} value={r.id} className="bg-dark-900 text-white">
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          </div>
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="text-slate-200 font-semibold">{user.name}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-900 border border-slate-700 font-mono text-rose-300 uppercase">
+                {ROLE_LABELS[user.role] || user.role}
+              </span>
+              <button
+                type="button"
+                data-testid="logout-btn"
+                onClick={onLogout}
+                title="Sair"
+                aria-label="Sair do sistema"
+                className="p-1 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-700/50 transition-colors"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              data-testid="login-btn"
+              onClick={onOpenLogin}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700/60 transition-colors"
+            >
+              <LogIn className="h-3.5 w-3.5 text-emerald-400" />
+              Entrar
+            </button>
+          )}
 
           {/* Dark / Light Toggle */}
           <button

@@ -4,11 +4,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../api';
-import { HistoricoLotesTable } from './HistoricoLotesTable';
 import { ProcessadorSuccessCard } from './ProcessadorSuccessCard';
 import { ProcessadorPreviewCard } from './ProcessadorPreviewCard';
-
-const EMPTY_LOTES = [];
 
 const SAMPLE_CSV_CONTENT = `SKU;Produto;Quantidade;Data
 CF-643-PRE-G;Camiseta Baby Look Un Belo Dia Ria - G - Preta;2;2026-08-16
@@ -19,12 +16,8 @@ CF-572-BRA-M;Camiseta Tour Guns 2025 - M - Branca;10;2026-08-16
 `;
 
 export function ProcessadorPedidosView({
-  lotes = EMPTY_LOTES,
-  lotesLoading = false,
-  userRole = 'soporte',
-  userName = 'Agatha',
+  user = null,
   onProcessBatch,
-  onOpenCancelModal,
 }) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -33,6 +26,9 @@ export function ProcessadorPedidosView({
   const [processing, setProcessing] = useState(false);
   const [lastProcessedLote, setLastProcessedLote] = useState(null);
   const fileInputRef = useRef(null);
+
+  const userRole = user ? user.role : null;
+  const userName = user ? user.name : 'Não autenticado';
 
   // Check if role is allowed to process
   const canProcess = ['soporte', 'jefe', 'admin', 'ing'].includes(userRole);
@@ -256,14 +252,6 @@ export function ProcessadorPedidosView({
           )}
         </div>
       )}
-
-      {/* Historical Batches Section */}
-      <HistoricoLotesTable
-        lotes={lotes}
-        loading={lotesLoading}
-        onOpenCancelModal={onOpenCancelModal}
-        userRole={userRole}
-      />
     </div>
   );
 }

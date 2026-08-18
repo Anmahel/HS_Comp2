@@ -2,10 +2,17 @@ from flask import request, jsonify, current_app
 from sqlalchemy import or_
 from models import Brand, Cor, Design, SKU, Tamanho, Tipo
 from services.catalog_service import resolve_design, get_or_create_sku
+from services.sanitize import escape_like
+from services.auth_service import check_auth_roles, CATALOG_WRITE_ROLES
 from . import catalogs_bp
 
 def get_session():
     return current_app.db_session
+
+def require_write():
+    if request.method == 'GET':
+        return None
+    return check_auth_roles(CATALOG_WRITE_ROLES)
 
 # ---------------------------------------------------------
 # BRANDS (/api/brands)
@@ -13,6 +20,10 @@ def get_session():
 @catalogs_bp.route('/api/brands', methods=['GET', 'POST'])
 def handle_brands():
     session = get_session()
+    denied = require_write()
+    if denied:
+        return denied
+
     if request.method == 'GET':
         brands = session.query(Brand).all()
         return jsonify([b.to_dict() for b in brands])
@@ -39,6 +50,10 @@ def handle_brands():
 @catalogs_bp.route('/api/brands/<int:brand_id>', methods=['GET', 'PUT', 'DELETE'])
 def handle_brand_detail(brand_id):
     session = get_session()
+    denied = require_write()
+    if denied:
+        return denied
+
     brand = session.get(Brand, brand_id)
     if not brand:
         return jsonify({'error': 'Marca não encontrada'}), 404
@@ -74,6 +89,10 @@ def handle_brand_detail(brand_id):
 @catalogs_bp.route('/api/cores', methods=['GET', 'POST'])
 def handle_cores():
     session = get_session()
+    denied = require_write()
+    if denied:
+        return denied
+
     if request.method == 'GET':
         cores = session.query(Cor).all()
         return jsonify([c.to_dict() for c in cores])
@@ -99,6 +118,10 @@ def handle_cores():
 @catalogs_bp.route('/api/cores/<int:cor_id>', methods=['GET', 'PUT', 'DELETE'])
 def handle_cor_detail(cor_id):
     session = get_session()
+    denied = require_write()
+    if denied:
+        return denied
+
     cor_obj = session.get(Cor, cor_id)
     if not cor_obj:
         return jsonify({'error': 'Cor não encontrada'}), 404
@@ -125,6 +148,10 @@ def handle_cor_detail(cor_id):
 @catalogs_bp.route('/api/designs', methods=['GET', 'POST'])
 def handle_designs():
     session = get_session()
+    denied = require_write()
+    if denied:
+        return denied
+
     if request.method == 'GET':
         designs = session.query(Design).all()
         return jsonify([d.to_dict() for d in designs])
@@ -145,6 +172,10 @@ def handle_designs():
 @catalogs_bp.route('/api/designs/<int:design_id>', methods=['GET', 'PUT', 'DELETE'])
 def handle_design_detail(design_id):
     session = get_session()
+    denied = require_write()
+    if denied:
+        return denied
+
     design = session.get(Design, design_id)
     if not design:
         return jsonify({'error': 'Design não encontrado'}), 404
@@ -166,7 +197,7 @@ def handle_design_detail(design_id):
 
         # Check collision on nome_design with other designs
         if nome.lower() != design.nome_design.lower():
-            existing_nome = session.query(Design).filter(Design.nome_design.ilike(nome), Design.id != design_id).first()
+            existing_nome = session.query(Design).filter(Design.nome_design.ilike(escape_like(nome)), Design.id != design_id).first()
             if existing_nome:
                 return jsonify({'error': f"Design '{nome}' já cadastrado com Cód. Estampa '{existing_nome.codigo_estampa}'"}), 400
             design.nome_design = nome
@@ -186,6 +217,10 @@ def handle_design_detail(design_id):
 @catalogs_bp.route('/api/skus', methods=['GET', 'POST'])
 def handle_skus():
     session = get_session()
+    denied = require_write()
+    if denied:
+        return denied
+
     if request.method == 'GET':
         skus = session.query(SKU).all()
         return jsonify([s.to_dict() for s in skus])
@@ -194,14 +229,22 @@ def handle_skus():
         sku_val = data.get('sku', '').strip().upper()
         if not sku_val:
             return jsonify({'error': 'SKU é obrigatório'}), 400
-        sku_obj = get_or_create_sku(session, sku_val)
+        existing = session.query(SKU).filter_by(sku=sku_val).first()
+        if existing:
+            return jsonify(existing.to_dict()), 200
+        new_sku = SKU(sku=sku_val)
+        session.add(new_sku)
         session.commit()
-        return jsonify(sku_obj.to_dict()), 201
+        return jsonify(new_sku.to_dict()), 201
 
 
 @catalogs_bp.route('/api/tamanhos', methods=['GET', 'POST'])
 def handle_tamanhos():
     session = get_session()
+    denied = require_write()
+    if denied:
+        return denied
+
     if request.method == 'GET':
         tams = session.query(Tamanho).all()
         return jsonify([t.to_dict() for t in tams])
@@ -222,6 +265,10 @@ def handle_tamanhos():
 @catalogs_bp.route('/api/tipos', methods=['GET', 'POST'])
 def handle_tipos():
     session = get_session()
+    denied = require_write()
+    if denied:
+        return denied
+
     if request.method == 'GET':
         tipos = session.query(Tipo).all()
         return jsonify([t.to_dict() for t in tipos])

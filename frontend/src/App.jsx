@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Toaster } from 'sonner';
 import { useEstoque } from './hooks/useEstoque';
 import { Header } from './components/Header';
@@ -12,14 +12,17 @@ import { TabelaMovimentacoes } from './components/TabelaMovimentacoes';
 import { FormularioEstoqueModal } from './components/FormularioEstoqueModal';
 import { ModalUsarEstoque } from './components/ModalUsarEstoque';
 import { CancelarLoteModal } from './components/CancelarLoteModal';
+import { LoginModal } from './components/LoginModal';
+import { LoginView } from './components/LoginView';
+import { HistoricoLotesTable } from './components/HistoricoLotesTable';
 
 export function App() {
   const {
     theme,
     toggleTheme,
-    userRole,
-    userName,
-    setUserRole,
+    user,
+    login,
+    logout,
     activeTab,
     setActiveTab,
     selectedBrand,
@@ -58,6 +61,8 @@ export function App() {
     inventoryVersion,
   } = useEstoque();
 
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+
   // Keyboard Shortcuts (Ctrl+K / Cmd+K and Esc)
   useEffect(() => {
     let animFrameId = null;
@@ -90,6 +95,16 @@ export function App() {
     };
   }, [isFormModalOpen, isDeductModalOpen, isCancelLoteModalOpen, setActiveTab, closeFormModal, closeDeductModal, closeCancelLoteModal]);
 
+  // If user is not authenticated, display full-page LoginView
+  if (!user) {
+    return (
+      <div className="min-h-screen flex flex-col bg-dark-900 text-slate-100 selection:bg-rose-500/30 selection:text-rose-200">
+        <Toaster position="top-right" richColors closeButton />
+        <LoginView onLogin={login} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-dark-900 text-slate-100 selection:bg-rose-500/30 selection:text-rose-200">
       {/* Sonner Toast Notifications */}
@@ -103,8 +118,9 @@ export function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
         onOpenCreate={openCreateModal}
-        userRole={userRole}
-        onSelectRole={setUserRole}
+        user={user}
+        onOpenLogin={() => setIsLoginOpen(true)}
+        onLogout={logout}
       />
 
       {/* Navigation Tabs Bar */}
@@ -123,12 +139,17 @@ export function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {activeTab === 'pedidos' && (
           <ProcessadorPedidosView
-            lotes={lotes}
-            lotesLoading={lotesLoading}
-            userRole={userRole}
-            userName={userName}
+            user={user}
             onProcessBatch={processarPedidosBatch}
+          />
+        )}
+
+        {activeTab === 'historico_lotes' && (
+          <HistoricoLotesTable
+            lotes={lotes}
+            loading={lotesLoading}
             onOpenCancelModal={openCancelLoteModal}
+            userRole={user ? user.role : 'soporte'}
           />
         )}
 
@@ -208,6 +229,13 @@ export function App() {
           onConfirm={cancelarLoteBatch}
         />
       )}
+
+      {/* Login Modal */}
+      <LoginModal
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
+        onLogin={login}
+      />
 
       {/* Footer */}
       <footer className="border-t border-slate-800/80 bg-dark-900/60 py-4 text-center text-xs text-slate-500 font-mono">

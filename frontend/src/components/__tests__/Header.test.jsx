@@ -63,4 +63,51 @@ describe('Header Component Tests', () => {
     fireEvent.click(themeBtn);
     expect(handleToggleTheme).toHaveBeenCalledTimes(1);
   });
+
+  it('shows login button when no user is authenticated', () => {
+    const handleOpenLogin = vi.fn();
+    render(
+      <Header
+        brands={mockBrands}
+        selectedBrand="all"
+        onSelectBrand={() => {}}
+        theme="dark"
+        onToggleTheme={() => {}}
+        onOpenCreate={() => {}}
+        user={null}
+        onOpenLogin={handleOpenLogin}
+        onLogout={() => {}}
+      />
+    );
+
+    const loginBtn = screen.getByTestId('login-btn');
+    expect(loginBtn).toBeInTheDocument();
+    fireEvent.click(loginBtn);
+    expect(handleOpenLogin).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('user-session-badge')).not.toBeInTheDocument();
+  });
+
+  it('shows user session badge and triggers logout', () => {
+    const handleLogout = vi.fn();
+    render(
+      <Header
+        brands={mockBrands}
+        selectedBrand="all"
+        onSelectBrand={() => {}}
+        theme="dark"
+        onToggleTheme={() => {}}
+        onOpenCreate={() => {}}
+        user={{ role: 'admin', name: 'Admin' }}
+        onOpenLogin={() => {}}
+        onLogout={handleLogout}
+      />
+    );
+
+    expect(screen.getByTestId('user-session-badge')).toBeInTheDocument();
+    expect(screen.getByText('Admin')).toBeInTheDocument();
+    expect(screen.getByText(/Admin \/ Eng/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('logout-btn'));
+    expect(handleLogout).toHaveBeenCalledTimes(1);
+  });
 });
