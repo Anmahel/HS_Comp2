@@ -280,7 +280,17 @@ class LotePedido(Base):
     motivo_cancelamento = Column(String(500), nullable=True)
     usuario_responsavel = Column(String(100), default='Soporte / Agatha')
 
+    # PDF & Notification Tracking
+    has_pdf1 = Column(Boolean, default=False, nullable=False) # PDF 1 (S - Separacao / Imprenta)
+    pdf1_emitted_at = Column(DateTime, nullable=True)
+    pdf1_emitted_by = Column(String(100), nullable=True)
+
+    has_pdf2 = Column(Boolean, default=False, nullable=False) # PDF 2 (P - Producao / Separacao)
+    pdf2_emitted_at = Column(DateTime, nullable=True)
+    pdf2_emitted_by = Column(String(100), nullable=True)
+
     itens = relationship('ItemPedido', back_populates='lote', cascade='all, delete-orphan', lazy='joined')
+    notificacoes = relationship('NotificacaoLote', back_populates='lote', cascade='all, delete-orphan', lazy='select')
 
     def to_dict(self, include_items=False):
         res = {
@@ -296,11 +306,46 @@ class LotePedido(Base):
             'is_deleted': self.is_deleted,
             'deleted_at': self.deleted_at.isoformat() if self.deleted_at else None,
             'motivo_cancelamento': self.motivo_cancelamento,
-            'usuario_responsavel': self.usuario_responsavel
+            'usuario_responsavel': self.usuario_responsavel,
+            'has_pdf1': bool(self.has_pdf1),
+            'pdf1_emitted_at': self.pdf1_emitted_at.isoformat() if self.pdf1_emitted_at else None,
+            'pdf1_emitted_by': self.pdf1_emitted_by,
+            'has_pdf2': bool(self.has_pdf2),
+            'pdf2_emitted_at': self.pdf2_emitted_at.isoformat() if self.pdf2_emitted_at else None,
+            'pdf2_emitted_by': self.pdf2_emitted_by,
         }
         if include_items and self.itens:
             res['itens'] = [item.to_dict() for item in self.itens]
         return res
+
+class NotificacaoLote(Base):
+    __tablename__ = 'notificacoes_lotes'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    lote_id = Column(Integer, ForeignKey('lotes_pedidos.id', ondelete='CASCADE'), nullable=False)
+    tipo_pdf = Column(String(10), nullable=False) # 'PDF1' | 'PDF2'
+    usuario_emissor = Column(String(100), nullable=False, default='Sistema')
+    roles_destino = Column(String(255), nullable=False) # e.g. 'imprenta,separacion,geral' or 'separacion,geral'
+    mensagem = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    lote = relationship('LotePedido', back_populates='notificacoes')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'lote_id': self.lote_id,
+            'tipo_pdf': self.tipo_pdf,
+            'usuario_emissor': self.usuario_emissor,
+            'roles_destino': self.roles_destino.split(',') if self.roles_destino else [],
+            'mensagem': self.mensagem,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'lote_nome': self.lote.nome_arquivo if self.lote else None,
+            'total_itens': self.lote.total_itens if self.lote else 0,
+            'total_impressao': self.lote.total_necessita_impressao if self.lote else 0,
+            'has_pdf1': self.lote.has_pdf1 if self.lote else False,
+            'has_pdf2': self.lote.has_pdf2 if self.lote else False,
+        }
 
 class User(Base):
     __tablename__ = 'users'

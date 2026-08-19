@@ -7,7 +7,7 @@ import { HistoricoLotesTable } from '../HistoricoLotesTable';
 import { CancelarLoteModal } from '../CancelarLoteModal';
 
 describe('ProcessadorPedidosView & Batch Processing Tests', () => {
-  it('renders order processor view with dropzone and RBAC banner', () => {
+  it('renders order processor view with dropzone', () => {
     render(
       <ProcessadorPedidosView
         user={{ role: 'soporte', name: 'Agatha' }}
@@ -15,9 +15,8 @@ describe('ProcessadorPedidosView & Batch Processing Tests', () => {
       />
     );
 
-    expect(screen.getByText(/Módulo de Processamento de Pedidos & Desconto Atômico/i)).toBeInTheDocument();
     expect(screen.getByText(/Arraste sua planilha de pedidos aqui/i)).toBeInTheDocument();
-    expect(screen.getByText(/Carregar Planilha de Demonstração \(Agatha\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Formatos aceitos:/i)).toBeInTheDocument();
   });
 
   it('ProcessadorPreviewCard renders without Qtd Total column and handles pagination', () => {

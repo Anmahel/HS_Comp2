@@ -9,6 +9,7 @@ const ROLE_LABELS = {
   jefe: 'Jefe / Diretoria',
   admin: 'Admin / Eng',
   ing: 'Ing',
+  imprenta: 'Imprenta',
 };
 
 export function Header({

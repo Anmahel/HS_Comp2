@@ -61,7 +61,6 @@ export function ProcessadorPedidosView({
   const handleFileSelected = async (file) => {
     setSelectedFile(file);
     setLastProcessedLote(null);
-    setLoadingPreview(true);
 
     try {
       const formData = new FormData();
@@ -128,35 +127,7 @@ export function ProcessadorPedidosView({
 
   return (
     <div className="space-y-8">
-      {/* RBAC Header & Workflow Context Banner */}
-      <div className="p-5 rounded-2xl bg-gradient-to-r from-dark-800 via-dark-800 to-indigo-950/40 border border-slate-800 shadow-xl relative overflow-hidden">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="p-1.5 rounded-lg bg-rose-500/15 text-rose-400 border border-rose-500/30">
-                <FileSpreadsheet className="h-5 w-5" />
-              </span>
-              <h2 className="text-lg font-extrabold text-white tracking-tight">
-                Módulo de Processamento de Pedidos & Desconto Atômico
-              </h2>
-            </div>
-            <p className="text-xs text-slate-300 max-w-3xl leading-relaxed">
-              Ingestão de planilhas <b>CSV, XLSX e PDF</b>. O sistema consulta automaticamente o estoque de{' '}
-              <span className="text-indigo-300 font-semibold">Peças Prontas</span>, em seguida{' '}
-              <span className="text-amber-300 font-semibold">Estampas Avulsas</span> e encaminha o remanescente para a{' '}
-              <span className="text-rose-400 font-semibold">Fila de Impressão</span>, gerando os PDFs de <b>Imprenta (PDF 1)</b> e <b>Separação (PDF 2)</b>.
-            </p>
-          </div>
 
-          <div className="flex items-center gap-2 self-start md:self-auto bg-dark-900/80 px-3.5 py-2 rounded-xl border border-slate-700/60 text-xs">
-            <ShieldCheck className="h-4 w-4 text-emerald-400" />
-            <div>
-              <span className="text-slate-400 text-[10px] block">Perfil Ativo</span>
-              <span className="font-bold text-white font-mono uppercase">{userName} ({userRole})</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Success Notification Card */}
       {lastProcessedLote && (
@@ -175,11 +146,10 @@ export function ProcessadorPedidosView({
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
             onDrop={handleDrop}
-            className={`p-8 rounded-2xl border-2 border-dashed transition-colors text-center relative ${
-              dragActive
-                ? 'border-rose-500 bg-rose-500/10'
-                : 'border-slate-700 hover:border-slate-500 bg-dark-800/60'
-            }`}
+            className={`p-8 rounded-2xl border-2 border-dashed transition-colors text-center relative ${dragActive
+              ? 'border-rose-500 bg-rose-500/10'
+              : 'border-slate-700 hover:border-slate-500 bg-dark-800/60'
+              }`}
           >
             <input
               ref={fileInputRef}
@@ -219,7 +189,7 @@ export function ProcessadorPedidosView({
                 </div>
               )}
 
-              <div className="pt-2 flex items-center justify-center gap-3">
+              {/*   <div className="pt-2 flex items-center justify-center gap-3">
                 <button
                   type="button"
                   onClick={loadSampleData}
@@ -227,8 +197,8 @@ export function ProcessadorPedidosView({
                 >
                   <Sparkles className="h-3.5 w-3.5 text-rose-400" />
                   Carregar Planilha de Demonstração (Agatha)
-                </button>
-              </div>
+                </button> 
+              </div> */}
             </div>
           </div>
 

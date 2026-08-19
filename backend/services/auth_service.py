@@ -8,7 +8,7 @@ from functools import wraps
 from flask import request, jsonify, current_app
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 
-VALID_ROLES = {'soporte', 'separacion', 'geral', 'jefe', 'admin', 'ing'}
+VALID_ROLES = {'soporte', 'separacion', 'geral', 'jefe', 'admin', 'ing', 'imprenta'}
 ADMIN_ROLES = {'jefe', 'admin', 'ing'}
 ORDER_PROCESS_ROLES = {'soporte', 'jefe', 'admin', 'ing'}
 CATALOG_WRITE_ROLES = {'soporte', 'jefe', 'admin', 'ing'}

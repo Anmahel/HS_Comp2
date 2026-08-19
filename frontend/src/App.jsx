@@ -15,6 +15,7 @@ import { CancelarLoteModal } from './components/CancelarLoteModal';
 import { LoginModal } from './components/LoginModal';
 import { LoginView } from './components/LoginView';
 import { HistoricoLotesTable } from './components/HistoricoLotesTable';
+import { PedidosRolesView } from './components/PedidosRolesView';
 
 export function App() {
   const {
@@ -127,6 +128,7 @@ export function App() {
       <NavigationTabs
         activeTab={activeTab}
         onSelectTab={setActiveTab}
+        userRole={user?.role || 'geral'}
         counts={{
           lotes: lotes.length,
           pecas: pecasProntas.length,
@@ -141,6 +143,14 @@ export function App() {
           <ProcessadorPedidosView
             user={user}
             onProcessBatch={processarPedidosBatch}
+          />
+        )}
+
+        {activeTab === 'pedidos_roles' && (
+          <PedidosRolesView
+            lotes={lotes}
+            loading={lotesLoading}
+            user={user}
           />
         )}
 

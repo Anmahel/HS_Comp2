@@ -35,9 +35,6 @@ export function ProcessadorPreviewCard({
             <Layers className="h-5 w-5 text-indigo-400" />
             Prévia da Análise de Desconto em Cascada
           </h3>
-          <p className="text-xs text-slate-400 font-mono">
-            Arquivo: {previewData.filename} • {previewData.total_itens} unidades solicitadas
-          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -53,11 +50,10 @@ export function ProcessadorPreviewCard({
             data-testid="btn-processar-lote"
             onClick={onSubmit}
             disabled={processing || !canProcess}
-            className={`px-5 py-2 rounded-xl text-xs font-bold text-white shadow-lg transition-colors flex items-center gap-2 ${
-              canProcess
-                ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/30 cursor-pointer'
-                : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-            }`}
+            className={`px-5 py-2 rounded-xl text-xs font-bold text-white shadow-lg transition-colors flex items-center gap-2 ${canProcess
+              ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/30 cursor-pointer'
+              : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+              }`}
           >
             {processing ? (
               <>
@@ -66,7 +62,7 @@ export function ProcessadorPreviewCard({
               </>
             ) : (
               <>
-                <span>Processar Lote & Descontar Estoque</span>
+                <span>Processar Lote</span>
                 <ArrowRight className="h-4 w-4" />
               </>
             )}
@@ -79,25 +75,21 @@ export function ProcessadorPreviewCard({
         <div className="p-4 rounded-xl bg-dark-900 border border-slate-800">
           <span className="text-[11px] font-semibold text-slate-400 uppercase">Total Pedidos</span>
           <div className="text-2xl font-bold font-mono text-white mt-1">{previewData.total_itens}</div>
-          <span className="text-[11px] text-slate-400">Total de unidades</span>
         </div>
 
         <div className="p-4 rounded-xl bg-dark-900 border border-indigo-500/30">
-          <span className="text-[11px] font-semibold text-indigo-400 uppercase">Almoxarifado (Peças)</span>
+          <span className="text-[11px] font-semibold text-indigo-400 uppercase">Prontas</span>
           <div className="text-2xl font-bold font-mono text-indigo-300 mt-1">{previewData.total_descontado_pecas}</div>
-          <span className="text-[11px] text-indigo-400/80">Atendidas por peça pronta</span>
         </div>
 
         <div className="p-4 rounded-xl bg-dark-900 border border-amber-500/30">
-          <span className="text-[11px] font-semibold text-amber-400 uppercase">Almoxarifado (Estampas)</span>
+          <span className="text-[11px] font-semibold text-amber-400 uppercase">Estampas</span>
           <div className="text-2xl font-bold font-mono text-amber-300 mt-1">{previewData.total_descontado_estampas}</div>
-          <span className="text-[11px] text-amber-400/80">Atendidas por estampa avulsa</span>
         </div>
 
         <div className="p-4 rounded-xl bg-dark-900 border border-rose-500/30">
           <span className="text-[11px] font-semibold text-rose-400 uppercase">Fila de Impressão</span>
           <div className="text-2xl font-bold font-mono text-rose-400 mt-1">{previewData.total_necessita_impressao}</div>
-          <span className="text-[11px] text-rose-400/80">Necessitam nova estampa</span>
         </div>
       </div>
 

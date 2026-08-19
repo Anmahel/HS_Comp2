@@ -1,7 +1,7 @@
 import React from 'react';
-import { Search, LayoutDashboard, Shirt, Palette, History, FileSpreadsheet, Clock } from 'lucide-react';
+import { Search, LayoutDashboard, Shirt, Palette, History, FileSpreadsheet, Clock, Printer, PackageCheck } from 'lucide-react';
 
-export function NavigationTabs({ activeTab, onSelectTab, counts = {} }) {
+export function NavigationTabs({ activeTab, onSelectTab, counts = {}, userRole = 'geral' }) {
   const tabs = [
     {
       id: 'pedidos',
@@ -9,6 +9,13 @@ export function NavigationTabs({ activeTab, onSelectTab, counts = {} }) {
       icon: FileSpreadsheet,
       badge: null,
       highlight: true,
+    },
+    {
+      id: 'pedidos_roles',
+      label: userRole === 'imprenta' ? 'Fila de Impressão' : (['separacion', 'geral'].includes(userRole) ? 'Separação & Despacho' : 'Painel de Pedidos'),
+      icon: userRole === 'imprenta' ? Printer : PackageCheck,
+      badge: counts.lotes !== undefined && counts.lotes > 0 ? `${counts.lotes}` : null,
+      highlight: false,
     },
     {
       id: 'historico_lotes',

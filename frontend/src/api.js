@@ -138,10 +138,14 @@ export const api = {
     });
   },
 
-  getWhatsappShareLink: (loteId, phone = '') => {
-    const q = phone ? `?phone=${encodeURIComponent(phone)}` : '';
-    return request(`/pedidos/lotes/${loteId}/whatsapp-link${q}`);
+  registrarEmissaoPdf: (loteId, tipoPdf) => {
+    return request(`/pedidos/lotes/${loteId}/registrar-pdf`, {
+      method: 'POST',
+      body: { tipo_pdf: tipoPdf },
+    });
   },
+
+  getNotificacoes: () => request('/pedidos/notificacoes'),
 
   getPdfImprentaUrl: (loteId) => `${API_BASE}/pedidos/lotes/${loteId}/pdf-imprenta`,
   getPdfSeparacaoUrl: (loteId) => `${API_BASE}/pedidos/lotes/${loteId}/pdf-separacao`,

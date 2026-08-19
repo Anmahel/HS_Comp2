@@ -135,7 +135,7 @@ export function LoginView({ onLogin }) {
               <Shield className="h-3.5 w-3.5 text-rose-400" />
               Contas de Acesso Rápido:
             </p>
-            <div className="grid grid-cols-2 gap-2 text-[11px]">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px]">
               <button
                 type="button"
                 onClick={() => setDemoCredentials('admin', 'admin123')}
@@ -152,10 +152,24 @@ export function LoginView({ onLogin }) {
               </button>
               <button
                 type="button"
+                onClick={() => setDemoCredentials('imprenta', 'admin123')}
+                className="px-2.5 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 text-rose-300 rounded-lg border border-rose-500/40 text-left transition-colors truncate"
+              >
+                🖨️ <span className="font-semibold">Imprenta</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setDemoCredentials('separacion', 'admin123')}
-                className="px-2.5 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 rounded-lg border border-slate-700 text-left transition-colors truncate"
+                className="px-2.5 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 text-indigo-300 rounded-lg border border-indigo-500/40 text-left transition-colors truncate"
               >
                 📦 <span className="font-semibold">Separación</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDemoCredentials('geral', 'admin123')}
+                className="px-2.5 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 rounded-lg border border-slate-700 text-left transition-colors truncate"
+              >
+                👥 <span className="font-semibold">Geral</span>
               </button>
               <button
                 type="button"

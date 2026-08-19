@@ -176,6 +176,7 @@ export function useEstoque() {
       fetchPecas();
       fetchEstampas();
     }
+    if (activeTab === 'pedidos_roles') fetchLotes();
     if (activeTab === 'historico_lotes') fetchLotes();
     if (activeTab === 'pecas') fetchPecas();
     if (activeTab === 'estampas') fetchEstampas();

@@ -1,7 +1,8 @@
 import io
 import urllib.parse
+from datetime import datetime, timezone
 from flask import request, jsonify, current_app, send_file
-from models import LotePedido, ItemPedido, PecaPronta, Estampa, MovimentacaoEstoque
+from models import LotePedido, ItemPedido, PecaPronta, Estampa, MovimentacaoEstoque, NotificacaoLote
 from services.parser_service import parse_order_file, parse_sku_details
 from services.pdf_service import generate_imprenta_pdf, generate_separacao_pdf
 from services.auth_service import require_roles, require_any_auth, get_current_user_context, ORDER_PROCESS_ROLES, ADMIN_ROLES
@@ -374,15 +375,33 @@ def obter_lote(lote_id):
 
 
 # ---------------------------------------------------------
-# PDF GENERATION ENDPOINTS (/api/pedidos/lotes/<id>/pdf-imprenta)
+# PDF GENERATION & NOTIFICATION ENDPOINTS
 # ---------------------------------------------------------
 @orders_bp.route('/api/pedidos/lotes/<int:lote_id>/pdf-imprenta', methods=['GET'])
 @require_any_auth
 def download_pdf_imprenta(lote_id):
     session = get_session()
+    user_ctx = get_current_user_context()
+    user_name = user_ctx.get('name', 'Sistema') if user_ctx else 'Sistema'
+
     lote = session.get(LotePedido, lote_id)
     if not lote:
         return jsonify({'error': 'Lote não encontrado'}), 404
+
+    # Update Lote state & create notification
+    lote.has_pdf1 = True
+    lote.pdf1_emitted_at = datetime.now(timezone.utc)
+    lote.pdf1_emitted_by = user_name
+
+    notif = NotificacaoLote(
+        lote_id=lote.id,
+        tipo_pdf='PDF1',
+        usuario_emissor=user_name,
+        roles_destino='imprenta,separacion,geral',
+        mensagem=f"PDF 1 (S - Imprenta/Separação) gerado para o Lote #{lote.id}"
+    )
+    session.add(notif)
+    session.commit()
 
     pdf_bytes = generate_imprenta_pdf(lote)
     return send_file(
@@ -397,9 +416,27 @@ def download_pdf_imprenta(lote_id):
 @require_any_auth
 def download_pdf_separacao(lote_id):
     session = get_session()
+    user_ctx = get_current_user_context()
+    user_name = user_ctx.get('name', 'Sistema') if user_ctx else 'Sistema'
+
     lote = session.get(LotePedido, lote_id)
     if not lote:
         return jsonify({'error': 'Lote não encontrado'}), 404
+
+    # Update Lote state & create notification
+    lote.has_pdf2 = True
+    lote.pdf2_emitted_at = datetime.now(timezone.utc)
+    lote.pdf2_emitted_by = user_name
+
+    notif = NotificacaoLote(
+        lote_id=lote.id,
+        tipo_pdf='PDF2',
+        usuario_emissor=user_name,
+        roles_destino='separacion,geral',
+        mensagem=f"PDF 2 (P - Produção/Separação) gerado para o Lote #{lote.id}"
+    )
+    session.add(notif)
+    session.commit()
 
     pdf_bytes = generate_separacao_pdf(lote)
     return send_file(
@@ -408,6 +445,66 @@ def download_pdf_separacao(lote_id):
         as_attachment=True,
         download_name=f"PDF_Separacao_Lote_{lote_id}.pdf"
     )
+
+
+@orders_bp.route('/api/pedidos/lotes/<int:lote_id>/registrar-pdf', methods=['POST'])
+@require_any_auth
+def registrar_emissao_pdf(lote_id):
+    session = get_session()
+    user_ctx = get_current_user_context()
+    user_name = user_ctx.get('name', 'Sistema') if user_ctx else 'Sistema'
+
+    data = request.get_json() or {}
+    tipo_pdf = str(data.get('tipo_pdf', 'PDF1')).upper().strip()
+
+    lote = session.get(LotePedido, lote_id)
+    if not lote:
+        return jsonify({'error': 'Lote não encontrado'}), 404
+
+    if tipo_pdf == 'PDF1':
+        lote.has_pdf1 = True
+        lote.pdf1_emitted_at = datetime.now(timezone.utc)
+        lote.pdf1_emitted_by = user_name
+        roles_destino = 'imprenta,separacion,geral'
+        msg = f"PDF 1 (S - Imprenta/Separação) emitido para o Lote #{lote.id}"
+    else:
+        lote.has_pdf2 = True
+        lote.pdf2_emitted_at = datetime.now(timezone.utc)
+        lote.pdf2_emitted_by = user_name
+        roles_destino = 'separacion,geral'
+        msg = f"PDF 2 (P - Produção/Separação) emitido para o Lote #{lote.id}"
+
+    notif = NotificacaoLote(
+        lote_id=lote.id,
+        tipo_pdf=tipo_pdf,
+        usuario_emissor=user_name,
+        roles_destino=roles_destino,
+        mensagem=msg
+    )
+    session.add(notif)
+    session.commit()
+
+    return jsonify({
+        'success': True,
+        'lote': lote.to_dict(include_items=False),
+        'notificacao': notif.to_dict()
+    }), 200
+
+
+@orders_bp.route('/api/pedidos/notificacoes', methods=['GET'])
+@require_any_auth
+def listar_notificacoes():
+    session = get_session()
+    user_ctx = get_current_user_context()
+    user_role = user_ctx.get('role', 'geral') if user_ctx else 'geral'
+
+    query = session.query(NotificacaoLote).order_by(NotificacaoLote.id.desc())
+
+    if user_role not in ADMIN_ROLES and user_role != 'soporte':
+        query = query.filter(NotificacaoLote.roles_destino.like(f"%{user_role}%"))
+
+    notificacoes = query.limit(50).all()
+    return jsonify([n.to_dict() for n in notificacoes]), 200
 
 
 # ---------------------------------------------------------
