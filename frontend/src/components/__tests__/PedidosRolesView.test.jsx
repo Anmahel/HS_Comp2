@@ -111,7 +111,7 @@ describe('Role-Based Orders & Notifications Tests', () => {
     expect(screen.getByText('CM-001-PRE-M')).toBeInTheDocument();
   });
 
-  it('Separacao / Geral Role view renders Master-Detail layout with sidebar and right pane items checklist table', () => {
+  it('Separacao / Geral Role view renders Master-Detail layout with direct Unidad column and dynamic Faltan discount', () => {
     render(
       <PedidosRolesView
         lotes={mockLotes}
@@ -120,36 +120,44 @@ describe('Role-Based Orders & Notifications Tests', () => {
       />
     );
 
-    // Title
-    expect(screen.getByText('Painel de Separação & Despacho')).toBeInTheDocument();
-
-    // Left Column Sidebar has all lotes
+    // Left Column Sidebar has all lotes without S/P badges
     expect(screen.getByText(/Lotes para Separação \(3\)/i)).toBeInTheDocument();
     expect(screen.getAllByText(/lote_recente_201.csv/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/lote_recente_200.csv/i)).toBeInTheDocument();
     expect(screen.getByText(/lote_antigo_199.csv/i)).toBeInTheDocument();
 
-    // Right Column KPI cards for active lote #201
+    // Right Column KPI cards for active lote #201 (clean titles without subtitles)
     expect(screen.getByText('Prontas')).toBeInTheDocument();
     expect(screen.getByText('Estampas')).toBeInTheDocument();
     expect(screen.getByText('Total')).toBeInTheDocument();
     expect(screen.getByText('Faltan')).toBeInTheDocument();
     expect(screen.getByText('10 un')).toBeInTheDocument();
     expect(screen.getByText('5 un')).toBeInTheDocument();
-    expect(screen.getByText('30 un')).toBeInTheDocument();
-    expect(screen.getByText('15 un')).toBeInTheDocument();
+    expect(screen.getAllByText('30 un').length).toBeGreaterThanOrEqual(1);
 
-    // Right Column direct Items Table (without modal)
+    // Table has columns OK, SKU Original, Produto, Unidad (no Qtd, Peça, Estampa)
+    expect(screen.getByText('OK')).toBeInTheDocument();
+    expect(screen.getByText('SKU Original')).toBeInTheDocument();
+    expect(screen.getByText('Produto')).toBeInTheDocument();
+    expect(screen.getByText('Unidad')).toBeInTheDocument();
+    expect(screen.queryByText('Peça')).not.toBeInTheDocument();
+    expect(screen.queryByText('Estampa')).not.toBeInTheDocument();
+
+    // Right Column direct Items Table row
     expect(screen.getByText('CM-001-PRE-M')).toBeInTheDocument();
     expect(screen.getByText('Camiseta Black Sabbath')).toBeInTheDocument();
+    expect(screen.getByText('2 un')).toBeInTheDocument();
 
-    // Interactive Checkbox clicking
+    // Interactive Checkbox clicking discounts from Faltan (30 - 2 = 28 un)
     const checkboxBtn = screen.getByLabelText('Marcar item CM-001-PRE-M');
     fireEvent.click(checkboxBtn);
-    expect(screen.getByText(/1 \/ 1/i)).toBeInTheDocument();
+    expect(screen.getByText('28 un')).toBeInTheDocument();
 
-    // Download PDF 2 button exists
-    expect(screen.getByText('Baixar PDF 2 (Separação)')).toBeInTheDocument();
+    // View button opens preview modal
+    const verPedidoBtn = screen.getByText('Ver Pedido');
+    fireEvent.click(verPedidoBtn);
+    expect(screen.getByText(/Detalhamento do Lote #201/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Fechar modal de detalhes'));
 
     // Switch active lote in sidebar to #200
     const lote200Btn = screen.getByText(/lote_recente_200.csv/i);

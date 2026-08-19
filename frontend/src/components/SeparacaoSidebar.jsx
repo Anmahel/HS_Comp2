@@ -26,8 +26,6 @@ export function SeparacaoSidebar({
         <div className="max-h-[780px] overflow-y-auto space-y-2.5 pr-1 no-scrollbar">
           {lotes.map((lote) => {
             const isSelected = selectedId === lote.id;
-            const hasS = Boolean(lote.has_pdf1);
-            const hasP = Boolean(lote.has_pdf2);
 
             return (
               <button
@@ -67,29 +65,9 @@ export function SeparacaoSidebar({
                       : 'N/A'}
                   </span>
 
-                  {/* Circular Badges (S) and (P) */}
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      title={hasS ? 'PDF 1 (S - Imprenta/Separação) Disponível' : 'PDF 1 (S) Pendente'}
-                      className={`h-5 w-5 rounded-full flex items-center justify-center font-mono font-black text-[10px] ${
-                        hasS
-                          ? 'bg-rose-500 text-white shadow-sm shadow-rose-500/50'
-                          : 'bg-slate-800 text-slate-500 border border-slate-700'
-                      }`}
-                    >
-                      S
-                    </span>
-                    <span
-                      title={hasP ? 'PDF 2 (P - Produção/Separação) Disponível' : 'PDF 2 (P) Pendente'}
-                      className={`h-5 w-5 rounded-full flex items-center justify-center font-mono font-black text-[10px] ${
-                        hasP
-                          ? 'bg-indigo-500 text-white shadow-sm shadow-indigo-500/50'
-                          : 'bg-slate-800 text-slate-500 border border-slate-700'
-                      }`}
-                    >
-                      P
-                    </span>
-                  </div>
+                  <span className="font-mono text-slate-400 font-semibold">
+                    {lote.total_itens} un
+                  </span>
                 </div>
               </button>
             );

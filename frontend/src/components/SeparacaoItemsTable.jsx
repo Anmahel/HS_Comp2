@@ -28,16 +28,13 @@ export function SeparacaoItemsTable({
               <th className="px-3 py-3 w-12 text-center">OK</th>
               <th className="px-4 py-3">SKU Original</th>
               <th className="px-4 py-3">Produto</th>
-              <th className="px-3 py-3 text-center font-mono">Qtd</th>
-              <th className="px-3 py-3 text-center text-indigo-300">Peça</th>
-              <th className="px-3 py-3 text-center text-amber-300">Estampa</th>
-              <th className="px-3 py-3 text-center text-rose-400">Imprimir</th>
+              <th className="px-4 py-3 text-center text-rose-400">Unidad</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/80 bg-dark-900/40">
             {currentItems.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
+                <td colSpan={4} className="px-4 py-12 text-center text-slate-500">
                   Nenhum produto listado para este lote.
                 </td>
               </tr>
@@ -75,24 +72,12 @@ export function SeparacaoItemsTable({
                       {item.sku_original}
                     </td>
 
-                    <td className="px-4 py-2.5 text-slate-300 truncate max-w-sm">
+                    <td className="px-4 py-2.5 text-slate-300 truncate max-w-md">
                       {item.produto_nome || '-'}
                     </td>
 
-                    <td className="px-3 py-2.5 text-center font-mono font-bold">
-                      {item.quantidade_solicitada}
-                    </td>
-
-                    <td className="px-3 py-2.5 text-center font-mono text-indigo-400">
-                      {item.quantidade_descontada_peca > 0 ? `${item.quantidade_descontada_peca} un` : '-'}
-                    </td>
-
-                    <td className="px-3 py-2.5 text-center font-mono text-amber-400">
-                      {item.quantidade_descontada_estampa > 0 ? `${item.quantidade_descontada_estampa} un` : '-'}
-                    </td>
-
-                    <td className="px-3 py-2.5 text-center font-mono text-rose-400 font-bold">
-                      {item.quantidade_necessita_impressao > 0 ? `${item.quantidade_necessita_impressao} un` : '-'}
+                    <td className="px-4 py-2.5 text-center font-mono font-bold text-rose-400">
+                      {item.quantidade_solicitada || item.quantidade_necessita_impressao || 1} un
                     </td>
                   </tr>
                 );
