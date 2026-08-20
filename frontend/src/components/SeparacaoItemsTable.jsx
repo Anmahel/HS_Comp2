@@ -1,26 +1,44 @@
 import React from 'react';
-import { CheckSquare, Square, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Square, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 
 const EMPTY_ITEMS = [];
+const PAGE_SIZE = 6;
 
 export function SeparacaoItemsTable({
   items = EMPTY_ITEMS,
   loteId,
-  checkedItems = {},
   onToggleCheck,
-  pageSize = 10,
-  onPageSizeChange,
   currentPage = 1,
   onPageChange,
+  producedCount = 0,
+  onOpenProducedModal,
 }) {
   const totalItems = items.length;
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const safePage = Math.min(Math.max(1, currentPage), totalPages);
-  const startIndex = (safePage - 1) * pageSize;
-  const currentItems = items.slice(startIndex, startIndex + pageSize);
+  const startIndex = (safePage - 1) * PAGE_SIZE;
+  const currentItems = items.slice(startIndex, startIndex + PAGE_SIZE);
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-dark-800/90 overflow-hidden shadow-xl space-y-0">
+      {/* Table Header Bar with "Ver Producidos" button */}
+      <div className="flex items-center justify-between px-4 py-3 bg-dark-900/80 border-b border-slate-800">
+        <span className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono">
+          Itens Pendentes ({totalItems})
+        </span>
+
+        {onOpenProducedModal && (
+          <button
+            type="button"
+            onClick={onOpenProducedModal}
+            className="px-3 py-1.5 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-sm"
+          >
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+            Ver Producidos ({producedCount})
+          </button>
+        )}
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs text-slate-300">
           <thead className="bg-dark-900 text-[11px] font-bold text-slate-400 uppercase font-mono border-b border-slate-800">
@@ -35,40 +53,30 @@ export function SeparacaoItemsTable({
             {currentItems.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-4 py-12 text-center text-slate-500">
-                  Nenhum produto listado para este lote.
+                  Nenhum produto pendente para este lote.
                 </td>
               </tr>
             ) : (
               currentItems.map((item, idx) => {
-                const globalIdx = startIndex + idx;
-                const itemKey = `${loteId}-${globalIdx}`;
-                const isChecked = Boolean(checkedItems[itemKey]);
+                const itemKey = item.id ? `item-${item.id}` : `item-${loteId}-${item.sku_original}-${startIndex + idx}`;
 
                 return (
                   <tr
-                    key={`item-${loteId}-${item.id || item.sku_original}-${globalIdx}`}
-                    className={`hover:bg-slate-800/40 transition-colors ${
-                      isChecked ? 'bg-emerald-950/20 text-emerald-200' : ''
-                    }`}
+                    key={itemKey}
+                    className="hover:bg-slate-800/40 transition-colors"
                   >
                     <td className="px-3 py-2.5 text-center">
                       <button
                         type="button"
-                        onClick={() => onToggleCheck(itemKey)}
-                        aria-label={`Marcar item ${item.sku_original}`}
-                        className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-emerald-400 transition-colors inline-flex items-center justify-center"
+                        onClick={() => onToggleCheck(item)}
+                        aria-label={`Marcar item ${item.sku_original} como produzido`}
+                        className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-emerald-400 transition-colors inline-flex items-center justify-center"
                       >
-                        {isChecked ? (
-                          <CheckSquare className="h-4 w-4 text-emerald-400" />
-                        ) : (
-                          <Square className="h-4 w-4 text-slate-500" />
-                        )}
+                        <Square className="h-4 w-4" />
                       </button>
                     </td>
 
-                    <td className={`px-4 py-2.5 font-mono font-semibold ${
-                      isChecked ? 'line-through text-slate-400' : 'text-slate-200'
-                    }`}>
+                    <td className="px-4 py-2.5 font-mono font-semibold text-slate-200">
                       {item.sku_original}
                     </td>
 
@@ -87,24 +95,11 @@ export function SeparacaoItemsTable({
         </table>
       </div>
 
-      {/* Pagination Footer */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-dark-900/60 border-t border-slate-800 text-xs text-slate-400">
-        <div className="flex items-center gap-2">
-          <span>Itens por página:</span>
-          <select
-            value={pageSize}
-            onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            aria-label="Selecionar quantidade de itens por página"
-            className="px-2 py-1 bg-dark-800 text-slate-200 border border-slate-700 rounded-lg text-xs font-mono focus:border-indigo-500 focus:outline-none"
-          >
-            <option value={10}>10 por página</option>
-            <option value={20}>20 por página</option>
-            <option value={30}>30 por página</option>
-          </select>
-          <span className="text-slate-500 ml-2">
-            Mostrando {totalItems > 0 ? startIndex + 1 : 0} a {Math.min(startIndex + pageSize, totalItems)} de {totalItems} itens
-          </span>
-        </div>
+      {/* Pagination Footer - Fixed 6 items per page */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-dark-900/60 border-t border-slate-800 text-xs text-slate-400">
+        <span className="text-slate-500">
+          Mostrando {totalItems > 0 ? startIndex + 1 : 0} a {Math.min(startIndex + PAGE_SIZE, totalItems)} de {totalItems} pendentes (6 por página)
+        </span>
 
         <div className="flex items-center gap-1.5 self-end sm:self-auto">
           <button

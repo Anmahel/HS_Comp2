@@ -40,3 +40,33 @@ CM-001-PRE-M,Camiseta Rock,3,2026-08-16
     assert len(notifs) >= 2
     assert any(n['lote_id'] == lote_id and n['tipo_pdf'] == 'PDF1' for n in notifs)
     assert any(n['lote_id'] == lote_id and n['tipo_pdf'] == 'PDF2' for n in notifs)
+
+
+def test_update_item_status_and_picking_persistence(client):
+    csv_content = """SKU,Produto,Quantidade,Data
+CF-002-BRA-P,Baby Look Rock,2,2026-08-16
+"""
+    data = {
+        'file': (io.BytesIO(csv_content.encode('utf-8')), 'lote_status_test.csv')
+    }
+    res = client.post('/api/pedidos/procesar', data=data, content_type='multipart/form-data')
+    assert res.status_code == 201
+    lote_data = res.get_json()['lote']
+    item_id = lote_data['itens'][0]['id']
+    assert lote_data['itens'][0]['status'] == 'pendiente'
+
+    # Update to producido
+    patch_res = client.patch(f'/api/lotes/items/{item_id}/status', json={'status': 'producido'})
+    assert patch_res.status_code == 200
+    assert patch_res.get_json()['item']['status'] == 'producido'
+    assert patch_res.get_json()['item']['updated_at'] is not None
+
+    # Verify invalid status is rejected
+    bad_res = client.patch(f'/api/lotes/items/{item_id}/status', json={'status': 'invalid_status'})
+    assert bad_res.status_code == 400
+
+    # Revert to pendiente
+    revert_res = client.patch(f'/api/pedidos/items/{item_id}/status', json={'status': 'pendiente'})
+    assert revert_res.status_code == 200
+    assert revert_res.get_json()['item']['status'] == 'pendiente'
+

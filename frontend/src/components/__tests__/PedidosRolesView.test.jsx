@@ -28,6 +28,7 @@ describe('Role-Based Orders & Notifications Tests', () => {
           quantidade_descontada_peca: 1,
           quantidade_descontada_estampa: 0,
           quantidade_necessita_impressao: 1,
+          status: 'pendiente',
         }
       ]
     },
@@ -52,6 +53,7 @@ describe('Role-Based Orders & Notifications Tests', () => {
           quantidade_descontada_peca: 1,
           quantidade_descontada_estampa: 0,
           quantidade_necessita_impressao: 0,
+          status: 'pendiente',
         }
       ]
     },
@@ -71,7 +73,7 @@ describe('Role-Based Orders & Notifications Tests', () => {
     }
   ];
 
-  it('Imprenta Role view renders 5-per-page list with download, modal and disabled printer placeholder', () => {
+  it('Imprenta Role view automatically renders 5-per-page list with download, modal and disabled printer placeholder', () => {
     render(
       <PedidosRolesView
         lotes={mockLotes}
@@ -82,6 +84,9 @@ describe('Role-Based Orders & Notifications Tests', () => {
 
     // Title for imprenta
     expect(screen.getByText('Fila de Impressão & Produção')).toBeInTheDocument();
+
+    // No manual switcher buttons
+    expect(screen.queryByText('Visão Separação')).not.toBeInTheDocument();
 
     // Table columns
     expect(screen.getByText('Data de Envio')).toBeInTheDocument();
@@ -111,7 +116,9 @@ describe('Role-Based Orders & Notifications Tests', () => {
     expect(screen.getByText('CM-001-PRE-M')).toBeInTheDocument();
   });
 
-  it('Separacao / Geral Role view renders Master-Detail layout with direct Unidad column and dynamic Faltan discount', () => {
+  it('Separacao / Geral Role view automatically renders clean Master-Detail layout with real-time picking persistence and produced modal', async () => {
+    const updateSpy = vi.spyOn(api, 'updateItemStatus').mockResolvedValue({ success: true });
+
     render(
       <PedidosRolesView
         lotes={mockLotes}
@@ -120,13 +127,17 @@ describe('Role-Based Orders & Notifications Tests', () => {
       />
     );
 
+    // No manual switcher buttons and no big banner
+    expect(screen.queryByText('Visão Imprenta')).not.toBeInTheDocument();
+    expect(screen.queryByText('Painel de Separação & Despacho')).not.toBeInTheDocument();
+
     // Left Column Sidebar has all lotes without S/P badges
     expect(screen.getByText(/Lotes para Separação \(3\)/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/lote_recente_201.csv/i).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/lote_recente_201.csv/i)).toBeInTheDocument();
     expect(screen.getByText(/lote_recente_200.csv/i)).toBeInTheDocument();
     expect(screen.getByText(/lote_antigo_199.csv/i)).toBeInTheDocument();
 
-    // Right Column KPI cards for active lote #201 (clean titles without subtitles)
+    // Right Column KPI cards for active lote #201
     expect(screen.getByText('Prontas')).toBeInTheDocument();
     expect(screen.getByText('Estampas')).toBeInTheDocument();
     expect(screen.getByText('Total')).toBeInTheDocument();
@@ -148,16 +159,29 @@ describe('Role-Based Orders & Notifications Tests', () => {
     expect(screen.getByText('Camiseta Black Sabbath')).toBeInTheDocument();
     expect(screen.getByText('2 un')).toBeInTheDocument();
 
-    // Interactive Checkbox clicking discounts from Faltan (30 - 2 = 28 un)
-    const checkboxBtn = screen.getByLabelText('Marcar item CM-001-PRE-M');
-    fireEvent.click(checkboxBtn);
-    expect(screen.getByText('28 un')).toBeInTheDocument();
+    // Button Ver Producidos initially shows (0)
+    expect(screen.getByText(/Ver Producidos \(0\)/i)).toBeInTheDocument();
 
-    // View button opens preview modal
-    const verPedidoBtn = screen.getByText('Ver Pedido');
-    fireEvent.click(verPedidoBtn);
-    expect(screen.getByText(/Detalhamento do Lote #201/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText('Fechar modal de detalhes'));
+    // Interactive Checkbox clicking marks as produced:
+    // 1. Removes item from pending table
+    // 2. Discounts from Faltan (30 - 2 = 28 un)
+    // 3. Increases Ver Producidos to (1)
+    // 4. Calls api.updateItemStatus
+    const checkboxBtn = screen.getByLabelText('Marcar item CM-001-PRE-M como produzido');
+    fireEvent.click(checkboxBtn);
+
+    expect(updateSpy).toHaveBeenCalledWith(1, 'producido');
+    expect(screen.getByText('28 un')).toBeInTheDocument();
+    expect(screen.getByText(/Ver Producidos \(1\)/i)).toBeInTheDocument();
+    expect(screen.queryByText('Camiseta Black Sabbath')).not.toBeInTheDocument();
+
+    // Open Modal Itens Producidos
+    fireEvent.click(screen.getByText(/Ver Producidos \(1\)/i));
+    expect(screen.getByText(/Itens Produzidos • Lote #201/i)).toBeInTheDocument();
+    expect(screen.getByText('CM-001-PRE-M')).toBeInTheDocument();
+
+    // Close modal
+    fireEvent.click(screen.getByLabelText('Fechar modal de produzidos'));
 
     // Switch active lote in sidebar to #200
     const lote200Btn = screen.getByText(/lote_recente_200.csv/i);

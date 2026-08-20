@@ -623,3 +623,32 @@ def get_whatsapp_link(lote_id):
         'whatsapp_link': url_wa,
         'total_itens_impressao': len(itens_imprenta)
     })
+
+
+# ---------------------------------------------------------
+# UPDATE ITEM STATUS (PATCH /api/lotes/items/<id>/status)
+# ---------------------------------------------------------
+@orders_bp.route('/api/lotes/items/<int:item_id>/status', methods=['PATCH'])
+@orders_bp.route('/api/pedidos/items/<int:item_id>/status', methods=['PATCH'])
+@require_any_auth
+def update_item_status(item_id):
+    session = get_session()
+    item = session.get(ItemPedido, item_id)
+    if not item:
+        return jsonify({'error': 'Item de pedido não encontrado'}), 404
+
+    data = request.get_json() or {}
+    novo_status = str(data.get('status', '')).strip().lower()
+    if novo_status not in ['pendiente', 'producido']:
+        return jsonify({'error': "Status inválido. Deve ser 'pendiente' ou 'producido'."}), 400
+
+    item.status = novo_status
+    item.updated_at = datetime.now(timezone.utc)
+    session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': f"Status do item #{item.id} atualizado para '{novo_status}'.",
+        'item': item.to_dict()
+    })
+

@@ -382,6 +382,8 @@ class ItemPedido(Base):
     data_pedido = Column(String(50), nullable=True)
     imagem_url = Column(String(500), nullable=True)
     tipo_item = Column(String(20), default='peca') # 'peca' | 'estampa'
+    status = Column(String(20), nullable=False, default='pendiente') # 'pendiente' | 'producido'
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     brand_id = Column(Integer, ForeignKey('brands.id'), nullable=True)
     design_id = Column(Integer, ForeignKey('designs.id'), nullable=True)
@@ -411,6 +413,8 @@ class ItemPedido(Base):
             'data_pedido': self.data_pedido,
             'imagem_url': self.imagem_url,
             'tipo_item': self.tipo_item,
+            'status': self.status or 'pendiente',
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'brand_id': self.brand_id,
             'brand_name': self.brand.name if self.brand else None,
             'brand_slug': self.brand.slug if self.brand else None,

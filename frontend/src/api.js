@@ -145,6 +145,13 @@ export const api = {
     });
   },
 
+  updateItemStatus: (itemId, status) => {
+    return request(`/lotes/items/${itemId}/status`, {
+      method: 'PATCH',
+      body: { status },
+    });
+  },
+
   getNotificacoes: () => request('/pedidos/notificacoes'),
 
   getPdfImprentaUrl: (loteId) => `${API_BASE}/pedidos/lotes/${loteId}/pdf-imprenta`,

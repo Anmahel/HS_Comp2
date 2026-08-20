@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Eye, Shirt, Palette, Layers, AlertCircle } from 'lucide-react';
+import { Shirt, Palette, Layers, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { api } from '../api';
 import { SeparacaoSidebar } from './SeparacaoSidebar';
 import { SeparacaoItemsTable } from './SeparacaoItemsTable';
-import { DetalhesPedidoModal } from './DetalhesPedidoModal';
+import { ModalItensProducidos } from './ModalItensProducidos';
 
 const EMPTY_LOTES = [];
 
@@ -11,9 +13,8 @@ export function SeparacaoDespacho({ lotes = EMPTY_LOTES }) {
 
   const [selectedId, setSelectedId] = useState(sortedLotes[0]?.id || null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [checkedItems, setCheckedItems] = useState({});
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [localStatus, setLocalStatus] = useState({});
+  const [isProducedModalOpen, setIsProducedModalOpen] = useState(false);
 
   const activeLote = sortedLotes.find((l) => l.id === selectedId) || sortedLotes[0] || null;
 
@@ -22,24 +23,68 @@ export function SeparacaoDespacho({ lotes = EMPTY_LOTES }) {
     setCurrentPage(1);
   };
 
-  const toggleCheck = (itemKey) => {
-    setCheckedItems((prev) => ({
+  // Map active items with local optimistic status or backend status
+  const allItems = (activeLote?.itens || []).map((it) => ({
+    ...it,
+    status: localStatus[it.id] !== undefined ? localStatus[it.id] : (it.status || 'pendiente'),
+  }));
+
+  const pendingItems = allItems.filter((it) => it.status !== 'producido');
+  const producedItems = allItems.filter((it) => it.status === 'producido');
+
+  const totalUnidades = activeLote?.total_itens || 0;
+  const producedUnits = producedItems.reduce((sum, item) => sum + (item.quantidade_solicitada || 1), 0);
+  const faltanUnits = Math.max(0, totalUnidades - producedUnits);
+
+  // Mark item as produced (optimistic + backend PATCH)
+  const handleMarkProduced = async (item) => {
+    const prevStatus = item.status;
+    const now = new Date().toISOString();
+
+    setLocalStatus((prev) => ({
       ...prev,
-      [itemKey]: !prev[itemKey],
+      [item.id]: 'producido',
     }));
+
+    toast.success(`Item ${item.sku_original} concluído!`);
+
+    try {
+      if (item.id) {
+        await api.updateItemStatus(item.id, 'producido');
+      }
+    } catch (e) {
+      // Revert optimistic update on failure
+      setLocalStatus((prev) => ({
+        ...prev,
+        [item.id]: prevStatus,
+      }));
+      toast.error(e.message || 'Erro ao sincronizar status do item.');
+    }
   };
 
-  const items = activeLote?.itens || [];
-  const totalUnidades = activeLote?.total_itens || 0;
+  // Revert item back to pending
+  const handleRevertItem = async (item) => {
+    const prevStatus = item.status;
 
-  // Calculate checked units to discount from Falta dynamically
-  const checkedUnits = items.reduce((sum, item, idx) => {
-    const isChecked = Boolean(checkedItems[`${activeLote?.id}-${idx}`]);
-    if (!isChecked) return sum;
-    return sum + (item.quantidade_solicitada || item.quantidade_necessita_impressao || 1);
-  }, 0);
+    setLocalStatus((prev) => ({
+      ...prev,
+      [item.id]: 'pendiente',
+    }));
 
-  const faltanUnits = Math.max(0, totalUnidades - checkedUnits);
+    toast.info(`Item ${item.sku_original} retornado para pendentes.`);
+
+    try {
+      if (item.id) {
+        await api.updateItemStatus(item.id, 'pendiente');
+      }
+    } catch (e) {
+      setLocalStatus((prev) => ({
+        ...prev,
+        [item.id]: prevStatus,
+      }));
+      toast.error(e.message || 'Erro ao reverter status do item.');
+    }
+  };
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 animate-fadeIn items-start">
@@ -58,28 +103,6 @@ export function SeparacaoDespacho({ lotes = EMPTY_LOTES }) {
           </div>
         ) : (
           <>
-            {/* Header of Active Lote */}
-            <div className="p-5 rounded-2xl bg-dark-800/90 border border-slate-800 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <h2 className="text-base font-bold text-white">
-                  Lote #{activeLote.id} • {activeLote.nome_arquivo}
-                </h2>
-                <p className="text-xs text-slate-400 font-mono">
-                  Data: {activeLote.created_at ? new Date(activeLote.created_at).toLocaleString('pt-BR') : 'N/A'} • Responsável: {activeLote.usuario_responsavel}
-                </p>
-              </div>
-
-              {/* Action Button: Ver Pedido (Abre Modal de Vista) */}
-              <button
-                type="button"
-                onClick={() => setIsDetailModalOpen(true)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 font-semibold text-xs transition-colors flex items-center gap-2 self-start sm:self-auto shrink-0"
-              >
-                <Eye className="h-4 w-4 text-indigo-400" />
-                Ver Pedido
-              </button>
-            </div>
-
             {/* Zona Superior: 4 Tarjetas KPI en Fila Horizontal */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {/* 1. Prontas */}
@@ -123,27 +146,25 @@ export function SeparacaoDespacho({ lotes = EMPTY_LOTES }) {
               </div>
             </div>
 
-            {/* Zona Inferior: LISTA DE DATOS (OK, SKU Original, Produto, Unidad) */}
+            {/* Zona Inferior: LISTA DE PENDENCIAS (OK, SKU Original, Produto, Unidad) */}
             <SeparacaoItemsTable
-              items={items}
+              items={pendingItems}
               loteId={activeLote.id}
-              checkedItems={checkedItems}
-              onToggleCheck={toggleCheck}
-              pageSize={pageSize}
-              onPageSizeChange={setPageSize}
+              onToggleCheck={handleMarkProduced}
               currentPage={currentPage}
               onPageChange={setCurrentPage}
+              producedCount={producedItems.length}
+              onOpenProducedModal={() => setIsProducedModalOpen(true)}
             />
 
-            {/* Modal de Detalhes do Pedido */}
-            {isDetailModalOpen && (
-              <DetalhesPedidoModal
-                isOpen={isDetailModalOpen}
-                lote={activeLote}
-                onClose={() => setIsDetailModalOpen(false)}
-                showCheckboxes={false}
-              />
-            )}
+            {/* Modal de Itens Produzidos com Busca em Tempo Real */}
+            <ModalItensProducidos
+              isOpen={isProducedModalOpen}
+              onClose={() => setIsProducedModalOpen(false)}
+              items={allItems}
+              onRevertItem={handleRevertItem}
+              loteNome={`Lote #${activeLote.id}`}
+            />
           </>
         )}
       </div>
