@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { api, setAuthToken, clearAuthToken, getAuthToken } from '../api';
+import { ROLE_PERMISSIONS } from '../components/NavigationTabs';
 import { useCatalogs } from './useCatalogs';
 import { useInventory } from './useInventory';
 import { useOrders } from './useOrders';
@@ -85,19 +86,20 @@ export function useEstoque() {
   // Fetch dashboard stats
   const fetchDashboardStats = useCallback(async () => {
     try {
-      const data = await api.getDashboardStats();
+      const data = await api.getDashboardStats({ brand: selectedBrand });
       setDashboardStats(data);
     } catch (err) {
       toast.error(`Erro ao carregar estatísticas do dashboard: ${err.message}`);
     }
-  }, []);
+  }, [selectedBrand]);
 
   const handleDataMutation = useCallback(() => {
     fetchPecas();
     fetchEstampas();
     fetchMovimentacoes();
+    fetchDashboardStats();
     notifyInventoryChange();
-  }, [fetchPecas, fetchEstampas, fetchMovimentacoes, notifyInventoryChange]);
+  }, [fetchPecas, fetchEstampas, fetchMovimentacoes, fetchDashboardStats, notifyInventoryChange]);
 
   const {
     lotes,
@@ -151,6 +153,12 @@ export function useEstoque() {
     setAuthToken(data.token);
     setUser(data.user);
     userStorage()?.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+
+    const roleKey = (data.user?.role || 'geral').toLowerCase();
+    const allowed = ROLE_PERMISSIONS[roleKey] || ROLE_PERMISSIONS.geral;
+    if (allowed && allowed.length > 0) {
+      setActiveTab(allowed[0]);
+    }
     return data.user;
   }, []);
 
@@ -159,6 +167,17 @@ export function useEstoque() {
     userStorage()?.removeItem(USER_STORAGE_KEY);
     setUser(null);
   }, []);
+
+  // Guard activeTab based on user role permissions
+  useEffect(() => {
+    if (user?.role) {
+      const roleKey = (user.role || 'geral').toLowerCase();
+      const allowed = ROLE_PERMISSIONS[roleKey] || ROLE_PERMISSIONS.geral;
+      if (allowed && allowed.length > 0 && !allowed.includes(activeTab)) {
+        setActiveTab(allowed[0]);
+      }
+    }
+  }, [user, activeTab]);
 
   // Restore session on load if a token exists but no user object
   useEffect(() => {

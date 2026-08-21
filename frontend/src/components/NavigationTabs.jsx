@@ -1,8 +1,19 @@
 import React from 'react';
 import { Search, LayoutDashboard, Shirt, Palette, History, FileSpreadsheet, Clock, Printer, PackageCheck } from 'lucide-react';
 
+export const ROLE_PERMISSIONS = {
+  soporte: ['pedidos', 'historico_lotes'],
+  jefe: ['dashboard'],
+  admin: ['movimentacoes'],
+  ing: ['movimentacoes'],
+  separacion: ['pecas', 'verificador', 'pedidos_roles'],
+  general: ['pecas', 'verificador', 'estampas'],
+  geral: ['pecas', 'verificador', 'estampas'],
+  imprenta: ['pedidos_roles'],
+};
+
 export function NavigationTabs({ activeTab, onSelectTab, counts = {}, userRole = 'geral' }) {
-  const tabs = [
+  const allTabs = [
     {
       id: 'pedidos',
       label: 'Processar Pedidos & PDFs',
@@ -12,7 +23,7 @@ export function NavigationTabs({ activeTab, onSelectTab, counts = {}, userRole =
     },
     {
       id: 'pedidos_roles',
-      label: userRole === 'imprenta' ? 'Fila de Impressão' : (['separacion', 'geral'].includes(userRole) ? 'Separação & Despacho' : 'Painel de Pedidos'),
+      label: userRole === 'imprenta' ? 'Fila de Impressão' : (userRole === 'separacion' ? 'Separação & Despacho' : 'Painel de Pedidos'),
       icon: userRole === 'imprenta' ? Printer : PackageCheck,
       badge: counts.lotes !== undefined && counts.lotes > 0 ? `${counts.lotes}` : null,
       highlight: false,
@@ -58,11 +69,16 @@ export function NavigationTabs({ activeTab, onSelectTab, counts = {}, userRole =
     },
   ];
 
+  // Filter tabs based on role permissions
+  const normalizedRole = (userRole || 'geral').toLowerCase();
+  const allowedTabIds = ROLE_PERMISSIONS[normalizedRole] || ROLE_PERMISSIONS.geral;
+  const visibleTabs = allTabs.filter((tab) => allowedTabIds.includes(tab.id));
+
   return (
     <nav className="bg-dark-900/60 border-b border-slate-800/80 sticky top-[65px] z-20 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex space-x-1 sm:space-x-2 overflow-x-auto py-2.5 no-scrollbar">
-          {tabs.map((tab) => {
+          {visibleTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
 

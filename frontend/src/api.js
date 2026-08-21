@@ -187,5 +187,14 @@ export const api = {
     const query = new URLSearchParams(params);
     return request(`/movimentacoes?${query.toString()}`);
   },
-  getDashboardStats: () => request('/dashboard/stats'),
+  getDashboardStats: (params = {}) => {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, val]) => {
+      if (val !== undefined && val !== null && val !== '') {
+        query.append(key, val);
+      }
+    });
+    const qs = query.toString();
+    return request(`/dashboard/stats${qs ? `?${qs}` : ''}`);
+  },
 };

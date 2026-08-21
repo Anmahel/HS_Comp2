@@ -113,11 +113,6 @@ export function App() {
 
       {/* Top Header */}
       <Header
-        brands={catalogs.brands}
-        selectedBrand={selectedBrand}
-        onSelectBrand={setSelectedBrand}
-        theme={theme}
-        onToggleTheme={toggleTheme}
         onOpenCreate={openCreateModal}
         user={user}
         onOpenLogin={() => setIsLoginOpen(true)}
@@ -250,14 +245,25 @@ export function App() {
       {/* Footer */}
       <footer className="border-t border-slate-800/80 bg-dark-900/60 py-4 text-center text-xs text-slate-500 font-mono">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>HC_comp © 2026 — Controle de Estoque & Produção Multi-Marcas</span>
+          <span>HC_comp © 2026</span>
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              API Online
-            </span>
-            <span>•</span>
-            <span>MariaDB / SQLite Active</span>
+            <a
+              href="https://www.cluberock.com.br"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 hover:text-rose-400 transition-colors underline-offset-4 hover:underline"
+            >
+              Clube Rock
+            </a>
+            <span>/</span>
+            <a
+              href="https://www.ridenation.com.br/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 hover:text-blue-400 transition-colors underline-offset-4 hover:underline"
+            >
+              Ride Nation
+            </a>
           </div>
         </div>
       </footer>

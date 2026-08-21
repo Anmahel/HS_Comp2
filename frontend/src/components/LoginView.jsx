@@ -181,6 +181,30 @@ export function LoginView({ onLogin }) {
             </div>
           </div>
         </form>
+
+        {/* Footer Links */}
+        <div className="pt-6 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500 font-mono">
+          <span>HC_comp © 2026</span>
+          <div className="flex items-center gap-2">
+            <a
+              href="https://www.cluberock.com.br"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 hover:text-rose-400 transition-colors underline-offset-4 hover:underline"
+            >
+              Clube Rock
+            </a>
+            <span>/</span>
+            <a
+              href="https://www.ridenation.com.br/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 hover:text-blue-400 transition-colors underline-offset-4 hover:underline"
+            >
+              Ride Nation
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   );

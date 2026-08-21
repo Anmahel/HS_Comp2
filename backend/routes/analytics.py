@@ -38,10 +38,36 @@ def get_movimentacoes():
 def get_dashboard_stats():
     session = get_session()
 
-    total_pecas = session.query(func.sum(PecaPronta.quantidade)).scalar() or 0
-    total_estampas = session.query(func.sum(Estampa.quantidade)).scalar() or 0
-    pecas_criticas = session.query(PecaPronta).filter(PecaPronta.quantidade > 0, PecaPronta.quantidade <= 5).count()
-    estampas_criticas = session.query(Estampa).filter(Estampa.quantidade > 0, Estampa.quantidade <= 5).count()
+    brand_param = request.args.get('brand')
+    brand_filter_id = None
+    if brand_param and brand_param.lower() != 'all':
+        if brand_param.isdigit():
+            brand_filter_id = int(brand_param)
+        else:
+            found_b = session.query(Brand).filter(func.lower(Brand.slug) == brand_param.lower()).first()
+            if not found_b:
+                found_b = session.query(Brand).filter(func.lower(Brand.name) == brand_param.lower()).first()
+            if found_b:
+                brand_filter_id = found_b.id
+
+    # Base Queries
+    pecas_query = session.query(func.sum(PecaPronta.quantidade))
+    estampas_query = session.query(func.sum(Estampa.quantidade))
+    crit_pecas_query = session.query(PecaPronta).filter(PecaPronta.quantidade > 0, PecaPronta.quantidade <= 5)
+    crit_estampas_query = session.query(Estampa).filter(Estampa.quantidade > 0, Estampa.quantidade <= 5)
+
+    if brand_filter_id:
+        pecas_query = pecas_query.filter(PecaPronta.brand_id == brand_filter_id)
+        estampas_query = estampas_query.filter(Estampa.brand_id == brand_filter_id)
+        crit_pecas_query = crit_pecas_query.filter(PecaPronta.brand_id == brand_filter_id)
+        crit_estampas_query = crit_estampas_query.filter(Estampa.brand_id == brand_filter_id)
+
+    total_pecas = pecas_query.scalar() or 0
+    total_estampas = estampas_query.scalar() or 0
+    pecas_criticas = crit_pecas_query.count()
+    estampas_criticas = crit_estampas_query.count()
+    total_geral = total_pecas + total_estampas
+    total_criticos = pecas_criticas + estampas_criticas
 
     # Brand stats breakdown
     brands = session.query(Brand).all()
@@ -49,52 +75,70 @@ def get_dashboard_stats():
     for b in brands:
         pecas_brand = session.query(func.sum(PecaPronta.quantidade)).filter(PecaPronta.brand_id == b.id).scalar() or 0
         estampas_brand = session.query(func.sum(Estampa.quantidade)).filter(Estampa.brand_id == b.id).scalar() or 0
+        tot_b = pecas_brand + estampas_brand
         brand_stats.append({
             'brand_id': b.id,
             'name': b.name,
             'slug': b.slug,
             'pecas_count': pecas_brand,
+            'pecas_quantidade': pecas_brand,
             'estampas_count': estampas_brand,
-            'total': pecas_brand + estampas_brand
+            'estampas_quantidade': estampas_brand,
+            'total': tot_b,
+            'total_quantidade': tot_b
         })
 
-    # Top designs
-    top_pecas = session.query(
-        Design.nome_design,
-        Design.codigo_estampa,
-        func.sum(PecaPronta.quantidade).label('total_pecas')
-    ).join(PecaPronta.design).group_by(Design.id).order_by(func.sum(PecaPronta.quantidade).desc()).limit(5).all()
+    # Top designs combining Peças and Estampas
+    designs = session.query(Design).all()
+    designs_aggregated = []
+    for d in designs:
+        p_q = session.query(func.sum(PecaPronta.quantidade)).filter(PecaPronta.design_id == d.id)
+        e_q = session.query(func.sum(Estampa.quantidade)).filter(Estampa.design_id == d.id)
+        if brand_filter_id:
+            p_q = p_q.filter(PecaPronta.brand_id == brand_filter_id)
+            e_q = e_q.filter(Estampa.brand_id == brand_filter_id)
 
-    top_designs = [
-        {
-            'nome_design': t[0],
-            'codigo_estampa': t[1],
-            'total_pecas': t[2]
-        }
-        for t in top_pecas
-    ]
+        p_qty = p_q.scalar() or 0
+        e_qty = e_q.scalar() or 0
+        tot_d = p_qty + e_qty
+        if tot_d > 0:
+            designs_aggregated.append({
+                'design_id': d.id,
+                'nome_design': d.nome_design or f"#{d.codigo_estampa}",
+                'codigo_estampa': d.codigo_estampa,
+                'total_pecas': p_qty,
+                'total_estampas': e_qty,
+                'total_quantidade': tot_d
+            })
+
+    designs_aggregated.sort(key=lambda x: x['total_quantidade'], reverse=True)
+    top_designs = designs_aggregated[:5]
 
     # Critical alert items
-    crit_pecas = session.query(PecaPronta).filter(PecaPronta.quantidade > 0, PecaPronta.quantidade <= 5).limit(10).all()
-    crit_estampas = session.query(Estampa).filter(Estampa.quantidade > 0, Estampa.quantidade <= 5).limit(10).all()
+    crit_pecas = crit_pecas_query.limit(10).all()
+    crit_estampas = crit_estampas_query.limit(10).all()
 
     critical_items = []
     for p in crit_pecas:
         d = p.to_dict()
         d['categoria'] = 'peca'
+        d['tipo_item'] = 'peca'
         critical_items.append(d)
     for e in crit_estampas:
         d = e.to_dict()
         d['categoria'] = 'estampa'
+        d['tipo_item'] = 'estampa'
         critical_items.append(d)
 
     return jsonify({
         'total_pecas_quantidade': total_pecas,
         'total_estampas_quantidade': total_estampas,
+        'total_geral_itens': total_geral,
         'pecas_criticas': pecas_criticas,
         'estampas_criticas': estampas_criticas,
-        'total_criticos': pecas_criticas + estampas_criticas,
+        'total_criticos': total_criticos,
         'brand_stats': brand_stats,
         'top_designs': top_designs,
         'critical_items': critical_items
     })
+

@@ -25,15 +25,13 @@ export function DashboardView({
     );
   }
 
-  const {
-    total_pecas_quantidade = 0,
-    total_estampas_quantidade = 0,
-    total_geral_itens = 0,
-    total_criticos = 0,
-    brand_stats = [],
-    top_designs = [],
-    critical_items = [],
-  } = stats;
+  const total_pecas_quantidade = stats.total_pecas_quantidade || 0;
+  const total_estampas_quantidade = stats.total_estampas_quantidade || 0;
+  const total_geral_itens = stats.total_geral_itens !== undefined ? stats.total_geral_itens : (total_pecas_quantidade + total_estampas_quantidade);
+  const total_criticos = stats.total_criticos !== undefined ? stats.total_criticos : ((stats.pecas_criticas || 0) + (stats.estampas_criticas || 0));
+  const brand_stats = stats.brand_stats || [];
+  const top_designs = stats.top_designs || [];
+  const critical_items = stats.critical_items || [];
 
   return (
     <div className="space-y-6">
